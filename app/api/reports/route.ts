@@ -10,24 +10,17 @@ const reportsDbId = process.env.NOTION_REPORTS_DB_ID!;
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+
     const { studentName, month, content } = body;
 
-    await notion.pages.create({
+    const response = await notion.pages.create({
       parent: {
         database_id: reportsDbId,
       },
+
       properties: {
         이름: {
           title: [
-            {
-              text: {
-                content: `${studentName} - ${month}`,
-              },
-            },
-          ],
-        },
-        학생명: {
-          rich_text: [
             {
               text: {
                 content: studentName,
@@ -35,32 +28,35 @@ export async function POST(req: Request) {
             },
           ],
         },
+
         연도: {
-          number: 2026,
+          select: {
+            name: "2026년",
+          },
         },
+
         월: {
           select: {
             name: month,
           },
         },
-        관찰일지: {
+
+        진도적응도: {
           rich_text: [
             {
               text: {
-                content,
+                content: content,
               },
             },
           ],
         },
-        작성상태: {
-          select: {
-            name: "완료",
-          },
-        },
       },
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({
+      ok: true,
+      id: response.id,
+    });
   } catch (error: any) {
     return NextResponse.json(
       {
