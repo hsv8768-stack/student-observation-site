@@ -7,6 +7,7 @@ export default function Home() {
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [selectedMonth, setSelectedMonth] = useState("1월");
   const [content, setContent] = useState("");
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     fetch("/api/students")
@@ -17,23 +18,21 @@ export default function Home() {
   const months = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
 
   async function saveReport() {
-    alert("저장 버튼 눌림");
+    setMessage("저장 시도 중...");
 
     if (!selectedStudent) {
-      alert("학생을 먼저 선택해주세요.");
+      setMessage("학생을 먼저 선택해주세요.");
       return;
     }
 
     if (!content.trim()) {
-      alert("관찰일지를 입력해주세요.");
+      setMessage("관찰일지를 입력해주세요.");
       return;
     }
 
     const res = await fetch("/api/reports", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         studentName: selectedStudent.name,
         month: selectedMonth,
@@ -44,17 +43,16 @@ export default function Home() {
     const data = await res.json();
 
     if (!res.ok) {
-      alert("저장 실패: " + data.detail);
+      setMessage("저장 실패: " + data.detail);
       return;
     }
 
-    alert("저장 완료!");
+    setMessage("저장 완료! 노션을 확인해주세요.");
   }
 
   return (
     <main style={{ padding: 40, fontFamily: "Arial" }}>
       <h1>학생 관찰일지 시스템</h1>
-
       <hr style={{ margin: "24px 0" }} />
 
       <h2>학생 목록</h2>
@@ -67,6 +65,7 @@ export default function Home() {
               setSelectedStudent(student);
               setContent("");
               setSelectedMonth("1월");
+              setMessage("");
             }}
             style={{
               padding: 12,
@@ -94,6 +93,7 @@ export default function Home() {
                 onClick={() => {
                   setSelectedMonth(month);
                   setContent("");
+                  setMessage("");
                 }}
                 style={{
                   padding: "8px 12px",
@@ -137,6 +137,8 @@ export default function Home() {
           >
             저장하기
           </button>
+
+          <p style={{ marginTop: 16, fontWeight: "bold" }}>{message}</p>
         </>
       )}
     </main>
