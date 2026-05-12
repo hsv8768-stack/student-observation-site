@@ -15,14 +15,29 @@ export default function Home() {
       .then((data) => setStudents(data.students || []));
   }, []);
 
-  const months = [
-    "1월", "2월", "3월", "4월", "5월", "6월",
-    "7월", "8월", "9월", "10월", "11월", "12월",
-  ];
+  async function loadReport(studentName: string, month: string) {
+    try {
+      setMessage("불러오는 중...");
+
+      const res = await fetch(
+        `/api/report?studentName=${encodeURIComponent(studentName)}&month=${encodeURIComponent(month)}`
+      );
+
+      const data = await res.json();
+
+      if (data.exists) {
+        setContent(data.content || "");
+        setMessage("기존 관찰일지를 불러왔습니다.");
+      } else {
+        setContent("");
+        setMessage("새 관찰일지를 작성해주세요.");
+      }
+    } catch (error: any) {
+      setMessage("불러오기 실패: " + error.message);
+    }
+  }
 
   async function saveReport() {
-    setMessage("저장 시도 중...");
-
     if (!selectedStudent) {
       setMessage("학생을 먼저 선택해주세요.");
       return;
@@ -34,6 +49,8 @@ export default function Home() {
     }
 
     try {
+      setMessage("저장 중...");
+
       const res = await fetch("/api/reports", {
         method: "POST",
         headers: {
@@ -49,22 +66,34 @@ export default function Home() {
       const data = await res.json();
 
       if (!res.ok) {
-        setMessage("저장 실패: " + (data.detail || data.error || "알 수 없는 오류"));
+        setMessage("저장 실패: " + (data.detail || data.error));
         return;
       }
 
-      setMessage("저장 완료! 노션 월별관찰일지 DB를 확인해주세요.");
+      setMessage("저장 완료!");
     } catch (error: any) {
       setMessage("저장 실패: " + error.message);
     }
   }
 
+  const months = [
+    "1월",
+    "2월",
+    "3월",
+    "4월",
+    "5월",
+    "6월",
+    "7월",
+    "8월",
+    "9월",
+    "10월",
+    "11월",
+    "12월",
+  ];
+
   return (
     <main style={{ padding: 40, fontFamily: "Arial" }}>
       <h1>학생 관찰일지 시스템</h1>
-      <p style={{ color: "red", fontWeight: "bold" }}>
-        저장 연결 테스트 버전
-      </p>
 
       <hr style={{ margin: "24px 0" }} />
 
@@ -74,11 +103,11 @@ export default function Home() {
         {students.map((student: any) => (
           <button
             key={student.id}
-            onClick={() => {
+            onClick={async () => {
               setSelectedStudent(student);
-              setContent("");
               setSelectedMonth("1월");
-              setMessage("");
+
+              await loadReport(student.name, "1월");
             }}
             style={{
               padding: 12,
@@ -115,10 +144,10 @@ export default function Home() {
             {months.map((month) => (
               <button
                 key={month}
-                onClick={() => {
+                onClick={async () => {
                   setSelectedMonth(month);
-                  setContent("");
-                  setMessage("");
+
+                  await loadReport(selectedStudent.name, month);
                 }}
                 style={{
                   padding: "8px 12px",
@@ -137,9 +166,9 @@ export default function Home() {
           </div>
 
           <textarea
-            placeholder="관찰일지를 입력하세요"
             value={content}
             onChange={(e) => setContent(e.target.value)}
+            placeholder="관찰일지를 입력하세요"
             style={{
               width: "100%",
               height: 300,
@@ -153,7 +182,6 @@ export default function Home() {
           <br />
 
           <button
-            type="button"
             onClick={saveReport}
             style={{
               padding: "12px 20px",
@@ -167,7 +195,13 @@ export default function Home() {
             저장하기
           </button>
 
-          <p style={{ marginTop: 16, fontWeight: "bold", color: "blue" }}>
+          <p
+            style={{
+              marginTop: 16,
+              fontWeight: "bold",
+              color: "blue",
+            }}
+          >
             {message}
           </p>
         </>
