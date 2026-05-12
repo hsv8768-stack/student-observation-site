@@ -1,7 +1,7 @@
 import { Client } from "@notionhq/client";
 import { NextResponse } from "next/server";
 
-const notion: any = new Client({
+const notion = new Client({
   auth: process.env.NOTION_TOKEN,
 });
 
@@ -27,8 +27,8 @@ function getText(property: any) {
 
 export async function GET() {
   try {
-    const response = await notion.databases.query({
-      database_id: studentsDbId,
+    const response = await notion.dataSources.query({
+      data_source_id: studentsDbId,
     });
 
     const students = response.results.map((page: any) => {
