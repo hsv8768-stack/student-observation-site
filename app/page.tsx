@@ -14,4 +14,3 @@ export default function Home() {
         <li>지난달 복사</li>
       </ul>
 </main>
-{/* update */}
