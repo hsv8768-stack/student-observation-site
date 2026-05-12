@@ -13,6 +13,5 @@ export default function Home() {
         <li>노션 저장</li>
         <li>지난달 복사</li>
       </ul>
-    </main>
-  );
-}
+</main>
+{/* update */}
