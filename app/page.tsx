@@ -15,7 +15,10 @@ export default function Home() {
       .then((data) => setStudents(data.students || []));
   }, []);
 
-  const months = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
+  const months = [
+    "1월", "2월", "3월", "4월", "5월", "6월",
+    "7월", "8월", "9월", "10월", "11월", "12월",
+  ];
 
   async function saveReport() {
     setMessage("저장 시도 중...");
@@ -34,13 +37,13 @@ export default function Home() {
       const res = await fetch("/api/reports", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           studentName: selectedStudent.name,
           month: selectedMonth,
-          content: content
-        })
+          content,
+        }),
       });
 
       const data = await res.json();
@@ -59,7 +62,9 @@ export default function Home() {
   return (
     <main style={{ padding: 40, fontFamily: "Arial" }}>
       <h1>학생 관찰일지 시스템</h1>
-      <p style={{ color: "red", fontWeight: "bold" }}>저장 연결 테스트 버전</p>
+      <p style={{ color: "red", fontWeight: "bold" }}>
+        저장 연결 테스트 버전
+      </p>
 
       <hr style={{ margin: "24px 0" }} />
 
@@ -78,9 +83,12 @@ export default function Home() {
             style={{
               padding: 12,
               borderRadius: 8,
-              border: selectedStudent?.id === student.id ? "2px solid black" : "1px solid #ccc",
+              border:
+                selectedStudent?.id === student.id
+                  ? "2px solid black"
+                  : "1px solid #ccc",
               background: "#fff",
-              cursor: "pointer"
+              cursor: "pointer",
             }}
           >
             {student.name || "이름없음"}
@@ -96,7 +104,14 @@ export default function Home() {
             {selectedStudent.name} - {selectedMonth}
           </h2>
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              marginBottom: 20,
+            }}
+          >
             {months.map((month) => (
               <button
                 key={month}
@@ -108,9 +123,12 @@ export default function Home() {
                 style={{
                   padding: "8px 12px",
                   borderRadius: 8,
-                  border: selectedMonth === month ? "2px solid black" : "1px solid #ccc",
+                  border:
+                    selectedMonth === month
+                      ? "2px solid black"
+                      : "1px solid #ccc",
                   background: "#fff",
-                  cursor: "pointer"
+                  cursor: "pointer",
                 }}
               >
                 {month}
@@ -127,7 +145,7 @@ export default function Home() {
               height: 300,
               padding: 16,
               borderRadius: 12,
-              border: "1px solid #ccc"
+              border: "1px solid #ccc",
             }}
           />
 
@@ -143,13 +161,15 @@ export default function Home() {
               border: "none",
               background: "black",
               color: "white",
-              cursor: "pointer"
+              cursor: "pointer",
             }}
           >
             저장하기
           </button>
 
-          <p style={{ marginTop: 16, fontWeight: "bold", color: "blue" }}>{message}</p>
+          <p style={{ marginTop: 16, fontWeight: "bold", color: "blue" }}>
+            {message}
+          </p>
         </>
       )}
     </main>
