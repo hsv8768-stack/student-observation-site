@@ -15,7 +15,7 @@ export default function Home() {
       .then((data) => setStudents(data.students || []));
   }, []);
 
-  const months = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
+  const months = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
   async function saveReport() {
     setMessage("저장 시도 중...");
@@ -30,29 +30,37 @@ export default function Home() {
       return;
     }
 
-    const res = await fetch("/api/reports", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        studentName: selectedStudent.name,
-        month: selectedMonth,
-        content,
-      }),
-    });
+    try {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          studentName: selectedStudent.name,
+          month: selectedMonth,
+          content: content
+        })
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (!res.ok) {
-      setMessage("저장 실패: " + data.detail);
-      return;
+      if (!res.ok) {
+        setMessage("저장 실패: " + (data.detail || data.error || "알 수 없는 오류"));
+        return;
+      }
+
+      setMessage("저장 완료! 노션 월별관찰일지 DB를 확인해주세요.");
+    } catch (error: any) {
+      setMessage("저장 실패: " + error.message);
     }
-
-    setMessage("저장 완료! 노션을 확인해주세요.");
   }
 
   return (
     <main style={{ padding: 40, fontFamily: "Arial" }}>
       <h1>학생 관찰일지 시스템</h1>
+      <p style={{ color: "red", fontWeight: "bold" }}>저장 연결 테스트 버전</p>
+
       <hr style={{ margin: "24px 0" }} />
 
       <h2>학생 목록</h2>
@@ -72,7 +80,7 @@ export default function Home() {
               borderRadius: 8,
               border: selectedStudent?.id === student.id ? "2px solid black" : "1px solid #ccc",
               background: "#fff",
-              cursor: "pointer",
+              cursor: "pointer"
             }}
           >
             {student.name || "이름없음"}
@@ -84,7 +92,9 @@ export default function Home() {
         <>
           <hr style={{ margin: "32px 0" }} />
 
-          <h2>{selectedStudent.name} - {selectedMonth}</h2>
+          <h2>
+            {selectedStudent.name} - {selectedMonth}
+          </h2>
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
             {months.map((month) => (
@@ -100,7 +110,7 @@ export default function Home() {
                   borderRadius: 8,
                   border: selectedMonth === month ? "2px solid black" : "1px solid #ccc",
                   background: "#fff",
-                  cursor: "pointer",
+                  cursor: "pointer"
                 }}
               >
                 {month}
@@ -117,7 +127,7 @@ export default function Home() {
               height: 300,
               padding: 16,
               borderRadius: 12,
-              border: "1px solid #ccc",
+              border: "1px solid #ccc"
             }}
           />
 
@@ -125,6 +135,7 @@ export default function Home() {
           <br />
 
           <button
+            type="button"
             onClick={saveReport}
             style={{
               padding: "12px 20px",
@@ -132,13 +143,13 @@ export default function Home() {
               border: "none",
               background: "black",
               color: "white",
-              cursor: "pointer",
+              cursor: "pointer"
             }}
           >
             저장하기
           </button>
 
-          <p style={{ marginTop: 16, fontWeight: "bold" }}>{message}</p>
+          <p style={{ marginTop: 16, fontWeight: "bold", color: "blue" }}>{message}</p>
         </>
       )}
     </main>
