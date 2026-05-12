@@ -13,6 +13,56 @@ export async function POST(req: Request) {
 
     const { studentName, month, content } = body;
 
+    // 기존 데이터 찾기
+    const existing = await notion.databases.query({
+      database_id: reportsDbId,
+
+      filter: {
+        and: [
+          {
+            property: "이름",
+            title: {
+              equals: studentName,
+            },
+          },
+
+          {
+            property: "월",
+            select: {
+              equals: month,
+            },
+          },
+        ],
+      },
+    });
+
+    // 이미 존재하면 수정(update)
+    if (existing.results.length > 0) {
+      const pageId = existing.results[0].id;
+
+      await notion.pages.update({
+        page_id: pageId,
+
+        properties: {
+          진도적응도: {
+            rich_text: [
+              {
+                text: {
+                  content,
+                },
+              },
+            ],
+          },
+        },
+      });
+
+      return NextResponse.json({
+        ok: true,
+        mode: "updated",
+      });
+    }
+
+    // 없으면 새 생성(create)
     const response = await notion.pages.create({
       parent: {
         database_id: reportsDbId,
@@ -45,7 +95,7 @@ export async function POST(req: Request) {
           rich_text: [
             {
               text: {
-                content: content,
+                content,
               },
             },
           ],
@@ -55,6 +105,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
+      mode: "created",
       id: response.id,
     });
   } catch (error: any) {
