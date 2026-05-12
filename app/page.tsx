@@ -11,27 +11,14 @@ export default function Home() {
   useEffect(() => {
     fetch("/api/students")
       .then((res) => res.json())
-      .then((data) => {
-        setStudents(data.students || []);
-      });
+      .then((data) => setStudents(data.students || []));
   }, []);
 
-  const months = [
-    "1월",
-    "2월",
-    "3월",
-    "4월",
-    "5월",
-    "6월",
-    "7월",
-    "8월",
-    "9월",
-    "10월",
-    "11월",
-    "12월",
-  ];
+  const months = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
 
   async function saveReport() {
+    alert("저장 버튼 눌림");
+
     if (!selectedStudent) {
       alert("학생을 먼저 선택해주세요.");
       return;
@@ -54,8 +41,9 @@ export default function Home() {
       }),
     });
 
+    const data = await res.json();
+
     if (!res.ok) {
-      const data = await res.json();
       alert("저장 실패: " + data.detail);
       return;
     }
@@ -83,10 +71,7 @@ export default function Home() {
             style={{
               padding: 12,
               borderRadius: 8,
-              border:
-                selectedStudent?.id === student.id
-                  ? "2px solid black"
-                  : "1px solid #ccc",
+              border: selectedStudent?.id === student.id ? "2px solid black" : "1px solid #ccc",
               background: "#fff",
               cursor: "pointer",
             }}
@@ -100,18 +85,9 @@ export default function Home() {
         <>
           <hr style={{ margin: "32px 0" }} />
 
-          <h2>
-            {selectedStudent.name} - {selectedMonth}
-          </h2>
+          <h2>{selectedStudent.name} - {selectedMonth}</h2>
 
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              flexWrap: "wrap",
-              marginBottom: 20,
-            }}
-          >
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
             {months.map((month) => (
               <button
                 key={month}
@@ -122,10 +98,7 @@ export default function Home() {
                 style={{
                   padding: "8px 12px",
                   borderRadius: 8,
-                  border:
-                    selectedMonth === month
-                      ? "2px solid black"
-                      : "1px solid #ccc",
+                  border: selectedMonth === month ? "2px solid black" : "1px solid #ccc",
                   background: "#fff",
                   cursor: "pointer",
                 }}
