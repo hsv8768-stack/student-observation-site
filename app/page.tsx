@@ -6,6 +6,7 @@ export default function Home() {
   const [students, setStudents] = useState<any[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [selectedMonth, setSelectedMonth] = useState("1월");
+  const [content, setContent] = useState("");
 
   useEffect(() => {
     fetch("/api/students")
@@ -30,6 +31,38 @@ export default function Home() {
     "12월",
   ];
 
+  async function saveReport() {
+    if (!selectedStudent) {
+      alert("학생을 먼저 선택해주세요.");
+      return;
+    }
+
+    if (!content.trim()) {
+      alert("관찰일지를 입력해주세요.");
+      return;
+    }
+
+    const res = await fetch("/api/reports", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        studentName: selectedStudent.name,
+        month: selectedMonth,
+        content,
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      alert("저장 실패: " + data.detail);
+      return;
+    }
+
+    alert("저장 완료!");
+  }
+
   return (
     <main style={{ padding: 40, fontFamily: "Arial" }}>
       <h1>학생 관찰일지 시스템</h1>
@@ -42,16 +75,23 @@ export default function Home() {
         {students.map((student: any) => (
           <button
             key={student.id}
-            onClick={() => setSelectedStudent(student)}
+            onClick={() => {
+              setSelectedStudent(student);
+              setContent("");
+              setSelectedMonth("1월");
+            }}
             style={{
               padding: 12,
               borderRadius: 8,
-              border: "1px solid #ccc",
+              border:
+                selectedStudent?.id === student.id
+                  ? "2px solid black"
+                  : "1px solid #ccc",
               background: "#fff",
               cursor: "pointer",
             }}
           >
-            {student.name}
+            {student.name || "이름없음"}
           </button>
         ))}
       </div>
@@ -75,7 +115,10 @@ export default function Home() {
             {months.map((month) => (
               <button
                 key={month}
-                onClick={() => setSelectedMonth(month)}
+                onClick={() => {
+                  setSelectedMonth(month);
+                  setContent("");
+                }}
                 style={{
                   padding: "8px 12px",
                   borderRadius: 8,
@@ -94,6 +137,8 @@ export default function Home() {
 
           <textarea
             placeholder="관찰일지를 입력하세요"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
             style={{
               width: "100%",
               height: 300,
@@ -107,6 +152,7 @@ export default function Home() {
           <br />
 
           <button
+            onClick={saveReport}
             style={{
               padding: "12px 20px",
               borderRadius: 10,
