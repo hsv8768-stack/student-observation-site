@@ -1,7 +1,7 @@
 import { Client } from "@notionhq/client";
 import { NextResponse } from "next/server";
 
-const notion = new Client({
+const notion: any = new Client({
   auth: process.env.NOTION_TOKEN,
 });
 
