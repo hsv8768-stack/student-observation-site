@@ -15,10 +15,19 @@ export default function Home() {
   const [content, setContent] = useState("");
   const [message, setMessage] = useState("");
 
+  const [newName, setNewName] = useState("");
+  const [newGrade, setNewGrade] = useState("초등저학년");
+  const [newLevel, setNewLevel] = useState("");
+  const [newStatus, setNewStatus] = useState("재원중");
+
+  async function refreshStudents() {
+    const res = await fetch("/api/students");
+    const data = await res.json();
+    setStudents(data.students || []);
+  }
+
   useEffect(() => {
-    fetch("/api/students")
-      .then((res) => res.json())
-      .then((data) => setStudents(data.students || []));
+    refreshStudents();
   }, []);
 
   const levels = [
@@ -36,6 +45,49 @@ export default function Home() {
     selectedLevel === "전체"
       ? students
       : students.filter((student) => student.level === selectedLevel);
+
+  async function addStudent() {
+    if (!newName.trim()) {
+      setMessage("학생 이름을 입력해주세요.");
+      return;
+    }
+
+    if (!newLevel.trim()) {
+      setMessage("레벨을 입력해주세요.");
+      return;
+    }
+
+    setMessage("학생 추가 중...");
+
+    const res = await fetch("/api/students/create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: newName,
+        grade: newGrade,
+        level: newLevel,
+        status: newStatus,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      setMessage("학생 추가 실패: " + (data.detail || data.error || "알 수 없는 오류"));
+      return;
+    }
+
+    setNewName("");
+    setNewLevel("");
+    setNewGrade("초등저학년");
+    setNewStatus("재원중");
+
+    await refreshStudents();
+
+    setMessage("학생 추가 완료!");
+  }
 
   async function loadReport(studentName: string, month: string) {
     setMessage("불러오는 중...");
@@ -128,6 +180,54 @@ export default function Home() {
   return (
     <main style={{ padding: 40, fontFamily: "Arial" }}>
       <h1>학생 관찰일지 시스템</h1>
+
+      <hr style={{ margin: "24px 0" }} />
+
+      <h2>학생 추가</h2>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+        <input
+          placeholder="학생 이름"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          style={{ padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
+        />
+
+        <input
+          placeholder="학년"
+          value={newGrade}
+          onChange={(e) => setNewGrade(e.target.value)}
+          style={{ padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
+        />
+
+        <input
+          placeholder="레벨 예: GK001"
+          value={newLevel}
+          onChange={(e) => setNewLevel(e.target.value)}
+          style={{ padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
+        />
+
+        <input
+          placeholder="상태"
+          value={newStatus}
+          onChange={(e) => setNewStatus(e.target.value)}
+          style={{ padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
+        />
+
+        <button
+          onClick={addStudent}
+          style={{
+            padding: "10px 16px",
+            borderRadius: 10,
+            border: "none",
+            background: "black",
+            color: "white",
+            cursor: "pointer",
+          }}
+        >
+          학생 추가
+        </button>
+      </div>
 
       <hr style={{ margin: "24px 0" }} />
 
