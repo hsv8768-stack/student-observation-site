@@ -11,18 +11,12 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    const {
-      name,
-      grade,
-      level,
-      status,
-    } = body;
+    const { name, grade, level, status } = body;
 
     const response = await notion.pages.create({
       parent: {
         database_id: studentsDbId,
       },
-
       properties: {
         이름: {
           title: [
@@ -33,35 +27,20 @@ export async function POST(req: Request) {
             },
           ],
         },
-
         학년: {
-          rich_text: [
-            {
-              text: {
-                content: grade,
-              },
-            },
-          ],
+          select: {
+            name: grade,
+          },
         },
-
         레벨: {
-          rich_text: [
-            {
-              text: {
-                content: level,
-              },
-            },
-          ],
+          select: {
+            name: level,
+          },
         },
-
         상태: {
-          rich_text: [
-            {
-              text: {
-                content: status,
-              },
-            },
-          ],
+          select: {
+            name: status,
+          },
         },
       },
     });
