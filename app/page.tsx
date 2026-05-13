@@ -9,7 +9,7 @@ const months = [
 
 export default function Home() {
   const [students, setStudents] = useState<any[]>([]);
-  const [selectedClass, setSelectedClass] = useState("전체");
+  const [selectedLevel, setSelectedLevel] = useState("전체");
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [selectedMonth, setSelectedMonth] = useState("1월");
   const [content, setContent] = useState("");
@@ -21,21 +21,21 @@ export default function Home() {
       .then((data) => setStudents(data.students || []));
   }, []);
 
-  const classes = [
+  const levels = [
     "전체",
     ...Array.from(
       new Set(
         students
-          .map((student) => student.className)
-          .filter((className) => className && className.trim())
+          .map((student) => student.level)
+          .filter((level) => level && level.trim())
       )
     ),
   ];
 
   const filteredStudents =
-    selectedClass === "전체"
+    selectedLevel === "전체"
       ? students
-      : students.filter((student) => student.className === selectedClass);
+      : students.filter((student) => student.level === selectedLevel);
 
   async function loadReport(studentName: string, month: string) {
     setMessage("불러오는 중...");
@@ -131,14 +131,14 @@ export default function Home() {
 
       <hr style={{ margin: "24px 0" }} />
 
-      <h2>반별 보기</h2>
+      <h2>레벨별 보기</h2>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
-        {classes.map((className) => (
+        {levels.map((level) => (
           <button
-            key={className}
+            key={level}
             onClick={() => {
-              setSelectedClass(className);
+              setSelectedLevel(level);
               setSelectedStudent(null);
               setContent("");
               setMessage("");
@@ -146,12 +146,12 @@ export default function Home() {
             style={{
               padding: "8px 12px",
               borderRadius: 8,
-              border: selectedClass === className ? "2px solid black" : "1px solid #ccc",
+              border: selectedLevel === level ? "2px solid black" : "1px solid #ccc",
               background: "#fff",
               cursor: "pointer",
             }}
           >
-            {className}
+            {level}
           </button>
         ))}
       </div>
@@ -192,7 +192,7 @@ export default function Home() {
           </h2>
 
           <div style={{ marginBottom: 12, color: "#555" }}>
-            {selectedStudent.className} / {selectedStudent.grade} / {selectedStudent.level}
+            {selectedStudent.grade} / {selectedStudent.level}
           </div>
 
           <div
