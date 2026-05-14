@@ -5,7 +5,7 @@ const notion: any = new Client({
   auth: process.env.NOTION_TOKEN,
 });
 
-const reportsDbId = process.env.NOTION_REPORTS_DB_ID!;
+const databaseId = process.env.NOTION_REPORTS_DB_ID!;
 
 export async function POST(req: Request) {
   try {
@@ -13,38 +13,27 @@ export async function POST(req: Request) {
 
     const { studentName, month, content } = body;
 
-    // 기존 데이터 찾기
-    const existing = await notion.databases.query({
-      database_id: reportsDbId,
-
-      filter: {
-        and: [
-          {
-            property: "이름",
-            title: {
-              equals: studentName,
-            },
-          },
-
-          {
-            property: "월",
-            select: {
-              equals: month,
-            },
-          },
-        ],
-      },
+    const searchResponse = await notion.dataSources.query({
+      data_source_id: databaseId,
     });
 
-    // 이미 존재하면 수정(update)
-    if (existing.results.length > 0) {
-      const pageId = existing.results[0].id;
+    const existingPage = searchResponse.results.find((page: any) => {
+      const props = page.properties;
 
+      const name =
+        props["이름"]?.title?.[0]?.plain_text || "";
+
+      const savedMonth =
+        props["월"]?.select?.name || "";
+
+      return name === studentName && savedMonth === month;
+    });
+
+    if (existingPage) {
       await notion.pages.update({
-        page_id: pageId,
-
+        page_id: existingPage.id,
         properties: {
-          진도적응도: {
+          "관찰일지": {
             rich_text: [
               {
                 text: {
@@ -62,14 +51,12 @@ export async function POST(req: Request) {
       });
     }
 
-    // 없으면 새 생성(create)
-    const response = await notion.pages.create({
+    await notion.pages.create({
       parent: {
-        database_id: reportsDbId,
+        data_source_id: databaseId,
       },
-
       properties: {
-        이름: {
+        "이름": {
           title: [
             {
               text: {
@@ -79,19 +66,13 @@ export async function POST(req: Request) {
           ],
         },
 
-        연도: {
-          select: {
-            name: "2026년",
-          },
-        },
-
-        월: {
+        "월": {
           select: {
             name: month,
           },
         },
 
-        진도적응도: {
+        "관찰일지": {
           rich_text: [
             {
               text: {
@@ -106,12 +87,11 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       mode: "created",
-      id: response.id,
     });
   } catch (error: any) {
     return NextResponse.json(
       {
-        error: "관찰일지를 저장하지 못했습니다.",
+        error: "저장 실패",
         detail: error.message,
       },
       { status: 500 }
