@@ -10,7 +10,7 @@ const months = [
 const levelOptions = [
   "중3", "중2", "중1", "초6",
   "GR105", "GR104", "GR103", "GR102", "GR101",
-  "GK005", "GK004", "GK003", "GK002", "GK001(B)", "GK001(A)",
+  "GK005", "GK004", "GK003", "GK002", "GK001", "GK001(A)",
 ];
 
 const gradeOptions = ["초등저학년", "초등고학년", "중등부"];
@@ -152,6 +152,66 @@ export default function Home() {
     } else {
       setMessage(`${previousMonth}에 저장된 관찰일지가 없습니다.`);
     }
+  }
+
+  function generateTemplate() {
+    if (!selectedStudent) {
+      setMessage("학생을 먼저 선택해주세요.");
+      return;
+    }
+
+    const level = selectedStudent.level || "";
+
+    const isLower =
+      level.includes("GK001") ||
+      level.includes("GK002") ||
+      level.includes("GK003") ||
+      level.includes("GK004") ||
+      level.includes("GK005");
+
+    if (isLower) {
+      setContent(`🧭 진도 적응도
+
+- 
+
+🎧 발음 및 읽기 학습
+
+- 
+
+🌱 수업 태도 전반
+
+- 
+
+📌 가정 연계 학습 안내
+
+- 
+
+👩‍👦 마무리 말씀
+
+- `);
+    } else {
+      setContent(`📊 진도 및 학습 흐름
+
+- 
+
+📘 단어 및 과제 학습 현황
+
+- 
+
+✏ 문법 및 독해 이해도
+
+- 
+
+🌿 전반적인 수업 태도 및 보완점
+
+- 
+
+💌 마무리 말씀
+
+- `);
+    }
+
+    setMessage("관찰일지 양식을 불러왔습니다.");
   }
 
   async function saveReport() {
@@ -345,20 +405,35 @@ export default function Home() {
             ))}
           </div>
 
-          <button
-            type="button"
-            onClick={copyPreviousMonth}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: "1px solid #ccc",
-              background: "#fff",
-              cursor: "pointer",
-              marginBottom: 12,
-            }}
-          >
-            지난달 복사
-          </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+            <button
+              type="button"
+              onClick={copyPreviousMonth}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1px solid #ccc",
+                background: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              지난달 복사
+            </button>
+
+            <button
+              type="button"
+              onClick={generateTemplate}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1px solid #ccc",
+                background: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              양식 자동 입력
+            </button>
+          </div>
 
           <textarea
             value={content}
