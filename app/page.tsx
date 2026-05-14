@@ -7,6 +7,15 @@ const months = [
   "7월", "8월", "9월", "10월", "11월", "12월",
 ];
 
+const levelOptions = [
+  "중3", "중2", "중1", "초6",
+  "GR105", "GR104", "GR103", "GR102", "GR101",
+  "GK005", "GK004", "GK003", "GK002", "GK001", "GK001(A)",
+];
+
+const gradeOptions = ["초등저학년", "초등고학년", "중등부"];
+const statusOptions = ["재원중", "휴원", "퇴원"];
+
 export default function Home() {
   const [students, setStudents] = useState<any[]>([]);
   const [selectedLevel, setSelectedLevel] = useState("전체");
@@ -14,6 +23,7 @@ export default function Home() {
   const [selectedMonth, setSelectedMonth] = useState("1월");
   const [content, setContent] = useState("");
   const [message, setMessage] = useState("");
+  const [studentAddMessage, setStudentAddMessage] = useState("");
 
   const [newName, setNewName] = useState("");
   const [newGrade, setNewGrade] = useState("초등저학년");
@@ -41,59 +51,60 @@ export default function Home() {
     ),
   ];
 
-  const levelOptions = levels.filter((level) => level !== "전체");
-
-  const gradeOptions = ["초등저학년", "초등고학년", "중등부"];
-  const statusOptions = ["재원중", "휴원", "퇴원"];
-
   const filteredStudents =
     selectedLevel === "전체"
       ? students
       : students.filter((student) => student.level === selectedLevel);
 
   async function addStudent() {
-    setMessage("학생 추가 버튼 눌림");
+    setStudentAddMessage("학생 추가 버튼 눌림");
 
     if (!newName.trim()) {
-      setMessage("학생 이름을 입력해주세요.");
+      setStudentAddMessage("학생 이름을 입력해주세요.");
       return;
     }
 
     if (!newLevel.trim()) {
-      setMessage("레벨을 선택해주세요.");
+      setStudentAddMessage("레벨을 선택해주세요.");
       return;
     }
 
-    setMessage("학생 추가 중...");
+    setStudentAddMessage("학생 추가 중...");
 
-    const res = await fetch("/api/students/create", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name: newName,
-        grade: newGrade,
-        level: newLevel,
-        status: newStatus,
-      }),
-    });
+    try {
+      const res = await fetch("/api/students/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: newName,
+          grade: newGrade,
+          level: newLevel,
+          status: newStatus,
+        }),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (!res.ok) {
-      setMessage("학생 추가 실패: " + (data.detail || data.error || "알 수 없는 오류"));
-      return;
+      if (!res.ok) {
+        setStudentAddMessage(
+          "학생 추가 실패: " + (data.detail || data.error || "알 수 없는 오류")
+        );
+        return;
+      }
+
+      setNewName("");
+      setNewLevel("");
+      setNewGrade("초등저학년");
+      setNewStatus("재원중");
+
+      await refreshStudents();
+
+      setStudentAddMessage("학생 추가 완료!");
+    } catch (error: any) {
+      setStudentAddMessage("학생 추가 실패: " + error.message);
     }
-
-    setNewName("");
-    setNewLevel("");
-    setNewGrade("초등저학년");
-    setNewStatus("재원중");
-
-    await refreshStudents();
-
-    setMessage("학생 추가 완료!");
   }
 
   async function loadReport(studentName: string, month: string) {
@@ -190,7 +201,7 @@ export default function Home() {
 
       <h2>학생 추가</h2>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
         <input
           placeholder="학생 이름"
           value={newName}
@@ -204,9 +215,7 @@ export default function Home() {
           style={{ padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
         >
           {gradeOptions.map((grade) => (
-            <option key={grade} value={grade}>
-              {grade}
-            </option>
+            <option key={grade} value={grade}>{grade}</option>
           ))}
         </select>
 
@@ -217,9 +226,7 @@ export default function Home() {
         >
           <option value="">레벨 선택</option>
           {levelOptions.map((level) => (
-            <option key={level} value={level}>
-              {level}
-            </option>
+            <option key={level} value={level}>{level}</option>
           ))}
         </select>
 
@@ -229,9 +236,7 @@ export default function Home() {
           style={{ padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
         >
           {statusOptions.map((status) => (
-            <option key={status} value={status}>
-              {status}
-            </option>
+            <option key={status} value={status}>{status}</option>
           ))}
         </select>
 
@@ -249,6 +254,8 @@ export default function Home() {
           학생 추가
         </button>
       </div>
+
+      <p style={{ fontWeight: "bold", color: "blue" }}>{studentAddMessage}</p>
 
       <hr style={{ margin: "24px 0" }} />
 
@@ -308,9 +315,7 @@ export default function Home() {
         <>
           <hr style={{ margin: "32px 0" }} />
 
-          <h2>
-            {selectedStudent.name} - {selectedMonth}
-          </h2>
+          <h2>{selectedStudent.name} - {selectedMonth}</h2>
 
           <div style={{ marginBottom: 12, color: "#555" }}>
             {selectedStudent.grade} / {selectedStudent.level}
