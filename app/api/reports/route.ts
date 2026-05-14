@@ -32,9 +32,7 @@ async function findReportsDatabase() {
     page_size: 20,
   });
 
-  const databases = search.results || [];
-
-  for (const db of databases) {
+  for (const db of search.results || []) {
     const props = db.properties || {};
 
     if (props["이름"] && props["월"] && props["관찰일지"]) {
@@ -92,6 +90,7 @@ export async function POST(req: Request) {
 
     const existingPage = queried.results.find((page: any) => {
       const props = page.properties || {};
+
       const name = getText(props["이름"]);
       const savedMonth = getText(props["월"]);
 
@@ -134,9 +133,13 @@ export async function POST(req: Request) {
           ],
         },
         월: {
-          select: {
-            name: month,
-          },
+          rich_text: [
+            {
+              text: {
+                content: month,
+              },
+            },
+          ],
         },
         관찰일지: {
           rich_text: [
