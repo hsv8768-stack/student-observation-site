@@ -1,19 +1,39 @@
-import { Client } from "@notionhq/client";
 import { NextResponse } from "next/server";
 
-const notion: any = new Client({
-  auth: process.env.NOTION_TOKEN,
-});
+export const dynamic = "force-dynamic";
+
+const NOTION_TOKEN = process.env.NOTION_TOKEN!;
+
+async function notionFetch(path: string, body?: any) {
+  const res = await fetch(`https://api.notion.com/v1${path}`, {
+    method: body ? "POST" : "GET",
+    headers: {
+      Authorization: `Bearer ${NOTION_TOKEN}`,
+      "Content-Type": "application/json",
+      "Notion-Version": "2022-06-28",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+    cache: "no-store",
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.message || "Notion API 오류");
+  }
+
+  return data;
+}
 
 function getText(property: any) {
   if (!property) return "";
 
   if (property.type === "title") {
-    return property.title?.[0]?.plain_text || "";
+    return property.title?.map((t: any) => t.plain_text).join("") || "";
   }
 
   if (property.type === "rich_text") {
-    return property.rich_text?.[0]?.plain_text || "";
+    return property.rich_text?.map((t: any) => t.plain_text).join("") || "";
   }
 
   if (property.type === "select") {
@@ -25,7 +45,7 @@ function getText(property: any) {
 
 export async function GET() {
   try {
-    const response = await notion.search({
+    const response = await notionFetch("/search", {
       filter: {
         property: "object",
         value: "page",
@@ -46,6 +66,10 @@ export async function GET() {
         };
       })
       .filter((student: any) => student.name && student.level);
+
+    students.sort((a: any, b: any) => {
+      return a.name.localeCompare(b.name, "ko");
+    });
 
     return NextResponse.json({ students });
   } catch (error: any) {
