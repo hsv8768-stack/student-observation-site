@@ -5,8 +5,6 @@ const notion: any = new Client({
   auth: process.env.NOTION_TOKEN,
 });
 
-const studentsDbId = process.env.NOTION_STUDENTS_DB_ID!;
-
 function getText(property: any) {
   if (!property) return "";
 
@@ -27,21 +25,27 @@ function getText(property: any) {
 
 export async function GET() {
   try {
-    const response = await notion.dataSources.query({
-      data_source_id: studentsDbId,
+    const response = await notion.search({
+      filter: {
+        property: "object",
+        value: "page",
+      },
+      page_size: 100,
     });
 
-    const students = response.results.map((page: any) => {
-      const props = page.properties;
+    const students = response.results
+      .map((page: any) => {
+        const props = page.properties || {};
 
-      return {
-        id: page.id,
-        name: getText(props["이름"]),
-        grade: getText(props["학년"]),
-        level: getText(props["레벨"]),
-        status: getText(props["상태"]),
-      };
-    });
+        return {
+          id: page.id,
+          name: getText(props["이름"]),
+          grade: getText(props["학년"]),
+          level: getText(props["레벨"]),
+          status: getText(props["상태"]),
+        };
+      })
+      .filter((student: any) => student.name && student.level);
 
     return NextResponse.json({ students });
   } catch (error: any) {
