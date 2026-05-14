@@ -7,16 +7,37 @@ const notion: any = new Client({
 
 async function findReportsDataSourceId() {
   const response = await notion.search({
-    query: "월별관찰일지",
+    query: "월별",
     filter: {
       property: "object",
       value: "data_source",
     },
-    page_size: 10,
+    page_size: 20,
   });
 
   if (!response.results || response.results.length === 0) {
-    throw new Error("월별관찰일지 데이터소스를 찾지 못했습니다.");
+    const fallback = await notion.search({
+      filter: {
+        property: "object",
+        value: "data_source",
+      },
+      page_size: 100,
+    });
+
+    const found = fallback.results.find((item: any) => {
+      const title =
+        item.title?.map((t: any) => t.plain_text).join("") ||
+        item.name ||
+        "";
+
+      return title.includes("관찰") || title.includes("월별");
+    });
+
+    if (!found) {
+      throw new Error("월별관찰일지 데이터소스를 찾지 못했습니다.");
+    }
+
+    return found.id;
   }
 
   return response.results[0].id;
@@ -34,7 +55,7 @@ export async function POST(req: Request) {
     });
 
     const existingPage = searchResponse.results.find((page: any) => {
-      const props = page.properties;
+      const props = page.properties || {};
 
       const name = props["이름"]?.title?.[0]?.plain_text || "";
       const savedMonth = props["월"]?.select?.name || "";
