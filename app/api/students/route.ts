@@ -27,8 +27,8 @@ function getText(property: any) {
 
 export async function GET() {
   try {
-    const response = await notion.databases.query({
-      database_id: studentsDbId,
+    const response = await notion.dataSources.query({
+      data_source_id: studentsDbId,
     });
 
     const students = response.results.map((page: any) => {
