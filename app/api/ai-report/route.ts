@@ -62,7 +62,7 @@ ${currentContent || "메모 없음"}
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "gpt-5.5-mini",
+        model: "gpt-4.1-mini",
         input: prompt,
       }),
     });
