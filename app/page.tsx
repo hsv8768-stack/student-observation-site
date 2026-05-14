@@ -41,19 +41,26 @@ export default function Home() {
     ),
   ];
 
+  const levelOptions = levels.filter((level) => level !== "전체");
+
+  const gradeOptions = ["초등저학년", "초등고학년", "중등부"];
+  const statusOptions = ["재원중", "휴원", "퇴원"];
+
   const filteredStudents =
     selectedLevel === "전체"
       ? students
       : students.filter((student) => student.level === selectedLevel);
 
   async function addStudent() {
+    setMessage("학생 추가 버튼 눌림");
+
     if (!newName.trim()) {
       setMessage("학생 이름을 입력해주세요.");
       return;
     }
 
     if (!newLevel.trim()) {
-      setMessage("레벨을 입력해주세요.");
+      setMessage("레벨을 선택해주세요.");
       return;
     }
 
@@ -121,8 +128,6 @@ export default function Home() {
     }
 
     const previousMonth = months[currentIndex - 1];
-
-    setMessage(`${previousMonth} 내용을 불러오는 중...`);
 
     const res = await fetch(
       `/api/report?studentName=${encodeURIComponent(selectedStudent.name)}&month=${encodeURIComponent(previousMonth)}`
@@ -193,26 +198,42 @@ export default function Home() {
           style={{ padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
         />
 
-        <input
-          placeholder="학년"
+        <select
           value={newGrade}
           onChange={(e) => setNewGrade(e.target.value)}
           style={{ padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
-        />
+        >
+          {gradeOptions.map((grade) => (
+            <option key={grade} value={grade}>
+              {grade}
+            </option>
+          ))}
+        </select>
 
-        <input
-          placeholder="레벨 예: GK001"
+        <select
           value={newLevel}
           onChange={(e) => setNewLevel(e.target.value)}
           style={{ padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
-        />
+        >
+          <option value="">레벨 선택</option>
+          {levelOptions.map((level) => (
+            <option key={level} value={level}>
+              {level}
+            </option>
+          ))}
+        </select>
 
-        <input
-          placeholder="상태"
+        <select
           value={newStatus}
           onChange={(e) => setNewStatus(e.target.value)}
           style={{ padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
-        />
+        >
+          {statusOptions.map((status) => (
+            <option key={status} value={status}>
+              {status}
+            </option>
+          ))}
+        </select>
 
         <button
           onClick={addStudent}
@@ -295,14 +316,7 @@ export default function Home() {
             {selectedStudent.grade} / {selectedStudent.level}
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              flexWrap: "wrap",
-              marginBottom: 20,
-            }}
-          >
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
             {months.map((month) => (
               <button
                 key={month}
@@ -326,21 +340,20 @@ export default function Home() {
             ))}
           </div>
 
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <button
-              type="button"
-              onClick={copyPreviousMonth}
-              style={{
-                padding: "10px 14px",
-                borderRadius: 10,
-                border: "1px solid #ccc",
-                background: "#fff",
-                cursor: "pointer",
-              }}
-            >
-              지난달 복사
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={copyPreviousMonth}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "1px solid #ccc",
+              background: "#fff",
+              cursor: "pointer",
+              marginBottom: 12,
+            }}
+          >
+            지난달 복사
+          </button>
 
           <textarea
             value={content}
@@ -372,13 +385,7 @@ export default function Home() {
             저장하기
           </button>
 
-          <p
-            style={{
-              marginTop: 16,
-              fontWeight: "bold",
-              color: "blue",
-            }}
-          >
+          <p style={{ marginTop: 16, fontWeight: "bold", color: "blue" }}>
             {message}
           </p>
         </>
