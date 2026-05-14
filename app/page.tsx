@@ -72,9 +72,7 @@ export default function Home() {
     try {
       const res = await fetch("/api/students/create", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: newName,
           grade: newGrade,
@@ -210,6 +208,41 @@ export default function Home() {
     }
 
     setMessage("관찰일지 양식을 불러왔습니다.");
+  }
+
+  async function generateAiDraft() {
+    if (!selectedStudent) {
+      setMessage("학생을 먼저 선택해주세요.");
+      return;
+    }
+
+    setMessage("AI 초안 생성 중...");
+
+    try {
+      const res = await fetch("/api/ai-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentName: selectedStudent.name,
+          level: selectedStudent.level,
+          grade: selectedStudent.grade,
+          month: selectedMonth,
+          currentContent: content,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMessage("AI 초안 생성 실패: " + (data.detail || data.error || "알 수 없는 오류"));
+        return;
+      }
+
+      setContent(data.draft || "");
+      setMessage("AI 초안 생성 완료! 내용을 확인 후 수정하고 저장하세요.");
+    } catch (error: any) {
+      setMessage("AI 초안 생성 실패: " + error.message);
+    }
   }
 
   async function saveReport() {
@@ -430,6 +463,20 @@ export default function Home() {
               }}
             >
               양식 자동 입력
+            </button>
+
+            <button
+              type="button"
+              onClick={generateAiDraft}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1px solid #ccc",
+                background: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              AI 초안 생성
             </button>
           </div>
 
