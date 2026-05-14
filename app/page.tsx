@@ -10,7 +10,7 @@ const months = [
 const levelOptions = [
   "중3", "중2", "중1", "초6",
   "GR105", "GR104", "GR103", "GR102", "GR101",
-  "GK005", "GK004", "GK003", "GK002", "GK001", "GK001(A)",
+  "GK005", "GK004", "GK003", "GK002", "GK001(B)", "GK001(A)",
 ];
 
 const gradeOptions = ["초등저학년", "초등고학년", "중등부"];
