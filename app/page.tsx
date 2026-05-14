@@ -57,7 +57,7 @@ export default function Home() {
       : students.filter((student) => student.level === selectedLevel);
 
   async function addStudent() {
-    setStudentAddMessage("학생 추가 버튼 눌림");
+    setStudentAddMessage("학생 추가 중...");
 
     if (!newName.trim()) {
       setStudentAddMessage("학생 이름을 입력해주세요.");
@@ -68,8 +68,6 @@ export default function Home() {
       setStudentAddMessage("레벨을 선택해주세요.");
       return;
     }
-
-    setStudentAddMessage("학생 추가 중...");
 
     try {
       const res = await fetch("/api/students/create", {
