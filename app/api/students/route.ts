@@ -1,7 +1,7 @@
 import { Client } from "@notionhq/client";
 import { NextResponse } from "next/server";
 
-const notion = new Client({
+const notion: any = new Client({
   auth: process.env.NOTION_TOKEN,
 });
 
@@ -27,8 +27,8 @@ function getText(property: any) {
 
 export async function GET() {
   try {
-    const response = await notion.dataSources.query({
-      data_source_id: studentsDbId,
+    const response = await notion.databases.query({
+      database_id: studentsDbId,
     });
 
     const students = response.results.map((page: any) => {
@@ -37,7 +37,6 @@ export async function GET() {
       return {
         id: page.id,
         name: getText(props["이름"]),
-        className: getText(props["반"]),
         grade: getText(props["학년"]),
         level: getText(props["레벨"]),
         status: getText(props["상태"]),
