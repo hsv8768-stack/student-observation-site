@@ -5,57 +5,83 @@ const notion: any = new Client({
   auth: process.env.NOTION_TOKEN,
 });
 
-const reportsDbId = process.env.NOTION_REPORTS_DB_ID!;
+async function findReportsDataSourceId() {
+  const response = await notion.search({
+    query: "월별관찰일지",
+    filter: {
+      property: "object",
+      value: "data_source",
+    },
+    page_size: 10,
+  });
+
+  if (!response.results || response.results.length === 0) {
+    throw new Error("월별관찰일지 데이터소스를 찾지 못했습니다.");
+  }
+
+  return response.results[0].id;
+}
+
+function getText(property: any) {
+  if (!property) return "";
+
+  if (property.type === "title") {
+    return property.title?.[0]?.plain_text || "";
+  }
+
+  if (property.type === "rich_text") {
+    return property.rich_text?.[0]?.plain_text || "";
+  }
+
+  if (property.type === "select") {
+    return property.select?.name || "";
+  }
+
+  return "";
+}
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
 
-    const studentName = searchParams.get("studentName");
-    const month = searchParams.get("month");
+    const studentName = searchParams.get("studentName") || "";
+    const month = searchParams.get("month") || "";
 
-    const response = await notion.databases.query({
-      database_id: reportsDbId,
+    const dataSourceId = await findReportsDataSourceId();
 
-      filter: {
-        and: [
-          {
-            property: "이름",
-            title: {
-              equals: studentName,
-            },
-          },
-
-          {
-            property: "월",
-            select: {
-              equals: month,
-            },
-          },
-        ],
-      },
+    const response = await notion.dataSources.query({
+      data_source_id: dataSourceId,
     });
 
-    if (response.results.length === 0) {
+    const matchedPage = response.results.find((page: any) => {
+      const props = page.properties || {};
+
+      const savedName = getText(props["이름"]);
+      const savedMonth = getText(props["월"]);
+
+      return savedName === studentName && savedMonth === month;
+    });
+
+    if (!matchedPage) {
       return NextResponse.json({
         exists: false,
+        content: "",
       });
     }
 
-    const page: any = response.results[0];
-
-    const content =
-      page.properties["진도적응도"]?.rich_text?.[0]?.plain_text || "";
+    const props = matchedPage.properties || {};
+    const content = getText(props["관찰일지"]);
 
     return NextResponse.json({
       exists: true,
       content,
-      pageId: page.id,
+      pageId: matchedPage.id,
     });
   } catch (error: any) {
     return NextResponse.json(
       {
-        error: error.message,
+        error: "관찰일지를 불러오지 못했습니다.",
+        detail: error.message,
       },
       { status: 500 }
     );
