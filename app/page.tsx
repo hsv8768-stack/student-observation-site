@@ -31,7 +31,9 @@ export default function Home() {
   const [newStatus, setNewStatus] = useState("재원중");
 
   async function refreshStudents() {
-    const res = await fetch("/api/students");
+    const res = await fetch(`/api/students?ts=${Date.now()}`, {
+      cache: "no-store",
+    });
     const data = await res.json();
     setStudents(data.students || []);
   }
@@ -40,16 +42,7 @@ export default function Home() {
     refreshStudents();
   }, []);
 
-  const levels = [
-    "전체",
-    ...Array.from(
-      new Set(
-        students
-          .map((student) => student.level)
-          .filter((level) => level && level.trim())
-      )
-    ),
-  ];
+  const levels = ["전체", ...levelOptions];
 
   const filteredStudents =
     selectedLevel === "전체"
@@ -72,7 +65,9 @@ export default function Home() {
     try {
       const res = await fetch("/api/students/create", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           name: newName,
           grade: newGrade,
@@ -90,14 +85,23 @@ export default function Home() {
         return;
       }
 
+      const addedStudent = {
+        id: data.id || `temp-${Date.now()}`,
+        name: newName,
+        grade: newGrade,
+        level: newLevel,
+        status: newStatus,
+      };
+
+      setStudents((prev) => [...prev, addedStudent]);
+      setSelectedLevel(newLevel);
+
       setNewName("");
       setNewLevel("");
       setNewGrade("초등저학년");
       setNewStatus("재원중");
 
-      await refreshStudents();
-
-      setStudentAddMessage("학생 추가 완료!");
+      setStudentAddMessage("학생 추가 완료! 목록에 바로 반영했습니다.");
     } catch (error: any) {
       setStudentAddMessage("학생 추가 실패: " + error.message);
     }
@@ -107,7 +111,8 @@ export default function Home() {
     setMessage("불러오는 중...");
 
     const res = await fetch(
-      `/api/report?studentName=${encodeURIComponent(studentName)}&month=${encodeURIComponent(month)}`
+      `/api/report?studentName=${encodeURIComponent(studentName)}&month=${encodeURIComponent(month)}&ts=${Date.now()}`,
+      { cache: "no-store" }
     );
 
     const data = await res.json();
@@ -137,7 +142,8 @@ export default function Home() {
     const previousMonth = months[currentIndex - 1];
 
     const res = await fetch(
-      `/api/report?studentName=${encodeURIComponent(selectedStudent.name)}&month=${encodeURIComponent(previousMonth)}`
+      `/api/report?studentName=${encodeURIComponent(selectedStudent.name)}&month=${encodeURIComponent(previousMonth)}&ts=${Date.now()}`,
+      { cache: "no-store" }
     );
 
     const data = await res.json();
@@ -221,7 +227,9 @@ export default function Home() {
     try {
       const res = await fetch("/api/ai-report", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           studentName: selectedStudent.name,
           level: selectedStudent.level,
