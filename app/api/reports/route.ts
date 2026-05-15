@@ -42,23 +42,22 @@ async function notionPatch(path: string, body: any) {
 
 async function findReportsDatabase() {
   const search = await notionPost("/search", {
-    query: "월별관찰일지",
     filter: {
       property: "object",
       value: "database",
     },
-    page_size: 20,
+    page_size: 100,
   });
 
   for (const db of search.results || []) {
     const props = db.properties || {};
 
     if (props["이름"] && props["월"] && props["관찰일지"]) {
-      return db.id;
+      return db;
     }
   }
 
-  throw new Error("월별관찰일지 데이터베이스를 찾지 못했습니다.");
+  throw new Error("이름/월/관찰일지 속성이 있는 데이터베이스를 찾지 못했습니다.");
 }
 
 function getText(property: any) {
@@ -79,12 +78,35 @@ function getText(property: any) {
   return "";
 }
 
+function makeMonthProperty(db: any, month: string) {
+  const monthType = db.properties?.["월"]?.type;
+
+  if (monthType === "select") {
+    return {
+      select: {
+        name: month,
+      },
+    };
+  }
+
+  return {
+    rich_text: [
+      {
+        text: {
+          content: month,
+        },
+      },
+    ],
+  };
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { studentName, month, content } = body;
 
-    const databaseId = await findReportsDatabase();
+    const db = await findReportsDatabase();
+    const databaseId = db.id;
 
     const queried = await notionPost(`/databases/${databaseId}/query`, {
       page_size: 100,
@@ -92,7 +114,6 @@ export async function POST(req: Request) {
 
     const existingPage = queried.results.find((page: any) => {
       const props = page.properties || {};
-
       const name = getText(props["이름"]);
       const savedMonth = getText(props["월"]);
 
@@ -134,15 +155,7 @@ export async function POST(req: Request) {
             },
           ],
         },
-        월: {
-          rich_text: [
-            {
-              text: {
-                content: month,
-              },
-            },
-          ],
-        },
+        월: makeMonthProperty(db, month),
         관찰일지: {
           rich_text: [
             {
