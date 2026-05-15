@@ -17,6 +17,11 @@ const gradeOptions = ["초등저학년", "초등고학년", "중등부"];
 const statusOptions = ["재원중", "휴원", "퇴원"];
 
 export default function Home() {
+  const [authorized, setAuthorized] = useState(false);
+  const [password, setPassword] = useState("");
+
+  const SITE_PASSWORD = "1234";
+
   const [students, setStudents] = useState<any[]>([]);
   const [selectedLevel, setSelectedLevel] = useState("전체");
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
@@ -39,8 +44,10 @@ export default function Home() {
   }
 
   useEffect(() => {
-    refreshStudents();
-  }, []);
+    if (authorized) {
+      refreshStudents();
+    }
+  }, [authorized]);
 
   const levels = ["전체", ...levelOptions];
 
@@ -290,6 +297,78 @@ export default function Home() {
     } else {
       setMessage("새 관찰일지를 저장 완료했습니다.");
     }
+  }
+
+  if (!authorized) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          fontFamily: "Arial",
+          background: "#f7f7f7",
+        }}
+      >
+        <div
+          style={{
+            width: 340,
+            padding: 28,
+            border: "1px solid #ddd",
+            borderRadius: 16,
+            background: "white",
+          }}
+        >
+          <h2 style={{ marginBottom: 20 }}>학생 관찰일지 시스템</h2>
+
+          <input
+            type="password"
+            placeholder="비밀번호 입력"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                if (password === SITE_PASSWORD) {
+                  setAuthorized(true);
+                } else {
+                  alert("비밀번호가 틀렸습니다.");
+                }
+              }
+            }}
+            style={{
+              width: "100%",
+              padding: 12,
+              borderRadius: 10,
+              border: "1px solid #ccc",
+              marginBottom: 12,
+              boxSizing: "border-box",
+            }}
+          />
+
+          <button
+            onClick={() => {
+              if (password === SITE_PASSWORD) {
+                setAuthorized(true);
+              } else {
+                alert("비밀번호가 틀렸습니다.");
+              }
+            }}
+            style={{
+              width: "100%",
+              padding: 12,
+              borderRadius: 10,
+              border: "none",
+              background: "black",
+              color: "white",
+              cursor: "pointer",
+            }}
+          >
+            입장하기
+          </button>
+        </div>
+      </main>
+    );
   }
 
   return (
