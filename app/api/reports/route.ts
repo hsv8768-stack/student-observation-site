@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 
 const NOTION_TOKEN = process.env.NOTION_TOKEN!;
 
-async function notionFetch(path: string, body?: any) {
+async function notionFetch(path: string, method: string = "GET", body?: any) {
   const res = await fetch(`https://api.notion.com/v1${path}`, {
-    method: body ? "POST" : "GET",
+    method,
     headers: {
       Authorization: `Bearer ${NOTION_TOKEN}`,
       "Content-Type": "application/json",
@@ -23,7 +23,7 @@ async function notionFetch(path: string, body?: any) {
 }
 
 async function findReportsDatabase() {
-  const search = await notionFetch("/search", {
+  const search = await notionFetch("/search", "POST", {
     query: "월별관찰일지",
     filter: {
       property: "object",
@@ -34,40 +34,23 @@ async function findReportsDatabase() {
 
   for (const db of search.results || []) {
     const props = db.properties || {};
-
     if (props["이름"] && props["월"] && props["관찰일지"]) {
       return db.id;
     }
   }
 
-  const fallback = await notionFetch("/search", {
-    filter: {
-      property: "object",
-      value: "database",
-    },
-    page_size: 100,
-  });
-
-  for (const db of fallback.results || []) {
-    const props = db.properties || {};
-
-    if (props["이름"] && props["월"] && props["관찰일지"]) {
-      return db.id;
-    }
-  }
-
-  throw new Error("이름/월/관찰일지 속성이 있는 월별관찰일지 데이터베이스를 찾지 못했습니다.");
+  throw new Error("월별관찰일지 데이터베이스를 찾지 못했습니다.");
 }
 
 function getText(property: any) {
   if (!property) return "";
 
   if (property.type === "title") {
-    return property.title?.[0]?.plain_text || "";
+    return property.title?.map((t: any) => t.plain_text).join("") || "";
   }
 
   if (property.type === "rich_text") {
-    return property.rich_text?.[0]?.plain_text || "";
+    return property.rich_text?.map((t: any) => t.plain_text).join("") || "";
   }
 
   if (property.type === "select") {
@@ -84,13 +67,12 @@ export async function POST(req: Request) {
 
     const databaseId = await findReportsDatabase();
 
-    const queried = await notionFetch(`/databases/${databaseId}/query`, {
+    const queried = await notionFetch(`/databases/${databaseId}/query`, "POST", {
       page_size: 100,
     });
 
     const existingPage = queried.results.find((page: any) => {
       const props = page.properties || {};
-
       const name = getText(props["이름"]);
       const savedMonth = getText(props["월"]);
 
@@ -98,7 +80,7 @@ export async function POST(req: Request) {
     });
 
     if (existingPage) {
-      await notionFetch(`/pages/${existingPage.id}`, {
+      await notionFetch(`/pages/${existingPage.id}`, "PATCH", {
         properties: {
           관찰일지: {
             rich_text: [
@@ -118,7 +100,7 @@ export async function POST(req: Request) {
       });
     }
 
-    await notionFetch("/pages", {
+    await notionFetch("/pages", "POST", {
       parent: {
         database_id: databaseId,
       },
