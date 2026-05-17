@@ -8,6 +8,29 @@ const notionHeaders = {
   "Notion-Version": "2022-06-28",
 };
 
+function makeRichTextChunks(text: string) {
+  const chunks = [];
+  const maxLength = 1900;
+
+  for (let i = 0; i < text.length; i += maxLength) {
+    chunks.push({
+      text: {
+        content: text.slice(i, i + maxLength),
+      },
+    });
+  }
+
+  return chunks.length > 0
+    ? chunks
+    : [
+        {
+          text: {
+            content: "",
+          },
+        },
+      ];
+}
+
 async function notionPost(path: string, body: any) {
   const res = await fetch(`https://api.notion.com/v1${path}`, {
     method: "POST",
@@ -124,13 +147,7 @@ export async function POST(req: Request) {
       await notionPatch(`/pages/${existingPage.id}`, {
         properties: {
           관찰일지: {
-            rich_text: [
-              {
-                text: {
-                  content,
-                },
-              },
-            ],
+            rich_text: makeRichTextChunks(content),
           },
         },
       });
@@ -157,13 +174,7 @@ export async function POST(req: Request) {
         },
         월: makeMonthProperty(db, month),
         관찰일지: {
-          rich_text: [
-            {
-              text: {
-                content,
-              },
-            },
-          ],
+          rich_text: makeRichTextChunks(content),
         },
       },
     });
