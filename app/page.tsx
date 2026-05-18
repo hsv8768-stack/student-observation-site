@@ -17,10 +17,10 @@ const gradeOptions = ["초등저학년", "초등고학년", "중등부"];
 const statusOptions = ["재원중", "휴원", "퇴원"];
 
 export default function Home() {
+  const SITE_PASSWORD = "1234";
+
   const [authorized, setAuthorized] = useState(false);
   const [password, setPassword] = useState("");
-
-  const SITE_PASSWORD = "1234";
 
   const [students, setStudents] = useState<any[]>([]);
   const [selectedLevel, setSelectedLevel] = useState("전체");
@@ -39,6 +39,7 @@ export default function Home() {
     const res = await fetch(`/api/students?ts=${Date.now()}`, {
       cache: "no-store",
     });
+
     const data = await res.json();
     setStudents(data.students || []);
   }
@@ -157,7 +158,9 @@ export default function Home() {
 
     if (data.exists) {
       setContent(data.content || "");
-      setMessage(`${previousMonth} 내용을 ${selectedMonth}에 복사했습니다. 저장하기를 누르면 반영됩니다.`);
+      setMessage(
+        `${previousMonth} 내용을 ${selectedMonth}에 복사했습니다. 저장하기를 누르면 반영됩니다.`
+      );
     } else {
       setMessage(`${previousMonth}에 저장된 관찰일지가 없습니다.`);
     }
@@ -249,7 +252,10 @@ export default function Home() {
       const data = await res.json();
 
       if (!res.ok) {
-        setMessage("AI 초안 생성 실패: " + (data.detail || data.error || "알 수 없는 오류"));
+        setMessage(
+          "AI 초안 생성 실패: " +
+            (data.detail || data.error || "알 수 없는 오류")
+        );
         return;
       }
 
@@ -257,6 +263,29 @@ export default function Home() {
       setMessage("AI 초안 생성 완료! 내용을 확인 후 수정하고 저장하세요.");
     } catch (error: any) {
       setMessage("AI 초안 생성 실패: " + error.message);
+    }
+  }
+
+  async function copyReportText() {
+    if (!selectedStudent) {
+      setMessage("학생을 먼저 선택해주세요.");
+      return;
+    }
+
+    if (!content.trim()) {
+      setMessage("복사할 관찰일지가 없습니다.");
+      return;
+    }
+
+    const textToCopy = `${selectedStudent.name} - ${selectedMonth} 관찰일지
+
+${content}`;
+
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      setMessage("관찰일지가 복사되었습니다. 카카오 채팅방에 붙여넣기하세요.");
+    } catch (error: any) {
+      setMessage("복사 실패: 브라우저에서 복사를 허용하지 않았습니다.");
     }
   }
 
@@ -288,7 +317,9 @@ export default function Home() {
     const data = await res.json();
 
     if (!res.ok) {
-      setMessage("저장 실패: " + (data.detail || data.error || "알 수 없는 오류"));
+      setMessage(
+        "저장 실패: " + (data.detail || data.error || "알 수 없는 오류")
+      );
       return;
     }
 
@@ -379,7 +410,14 @@ export default function Home() {
 
       <h2>학생 추가</h2>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          flexWrap: "wrap",
+          marginBottom: 10,
+        }}
+      >
         <input
           placeholder="학생 이름"
           value={newName}
@@ -393,7 +431,9 @@ export default function Home() {
           style={{ padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
         >
           {gradeOptions.map((grade) => (
-            <option key={grade} value={grade}>{grade}</option>
+            <option key={grade} value={grade}>
+              {grade}
+            </option>
           ))}
         </select>
 
@@ -404,7 +444,9 @@ export default function Home() {
         >
           <option value="">레벨 선택</option>
           {levelOptions.map((level) => (
-            <option key={level} value={level}>{level}</option>
+            <option key={level} value={level}>
+              {level}
+            </option>
           ))}
         </select>
 
@@ -414,7 +456,9 @@ export default function Home() {
           style={{ padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
         >
           {statusOptions.map((status) => (
-            <option key={status} value={status}>{status}</option>
+            <option key={status} value={status}>
+              {status}
+            </option>
           ))}
         </select>
 
@@ -439,7 +483,14 @@ export default function Home() {
 
       <h2>레벨별 보기</h2>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          flexWrap: "wrap",
+          marginBottom: 24,
+        }}
+      >
         {levels.map((level) => (
           <button
             key={level}
@@ -452,7 +503,8 @@ export default function Home() {
             style={{
               padding: "8px 12px",
               borderRadius: 8,
-              border: selectedLevel === level ? "2px solid black" : "1px solid #ccc",
+              border:
+                selectedLevel === level ? "2px solid black" : "1px solid #ccc",
               background: "#fff",
               cursor: "pointer",
             }}
@@ -493,13 +545,22 @@ export default function Home() {
         <>
           <hr style={{ margin: "32px 0" }} />
 
-          <h2>{selectedStudent.name} - {selectedMonth}</h2>
+          <h2>
+            {selectedStudent.name} - {selectedMonth}
+          </h2>
 
           <div style={{ marginBottom: 12, color: "#555" }}>
             {selectedStudent.grade} / {selectedStudent.level}
           </div>
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              marginBottom: 20,
+            }}
+          >
             {months.map((month) => (
               <button
                 key={month}
@@ -523,7 +584,14 @@ export default function Home() {
             ))}
           </div>
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              marginBottom: 12,
+            }}
+          >
             <button
               type="button"
               onClick={copyPreviousMonth}
@@ -564,6 +632,20 @@ export default function Home() {
               }}
             >
               AI 초안 생성
+            </button>
+
+            <button
+              type="button"
+              onClick={copyReportText}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1px solid #ccc",
+                background: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              관찰일지 복사
             </button>
           </div>
 
