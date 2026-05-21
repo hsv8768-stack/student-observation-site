@@ -3,18 +3,48 @@
 import { useEffect, useState } from "react";
 
 const months = [
-  "1월", "2월", "3월", "4월", "5월", "6월",
-  "7월", "8월", "9월", "10월", "11월", "12월",
+  "1월",
+  "2월",
+  "3월",
+  "4월",
+  "5월",
+  "6월",
+  "7월",
+  "8월",
+  "9월",
+  "10월",
+  "11월",
+  "12월",
 ];
 
 const levelOptions = [
-  "중3", "중2", "중1", "초6",
-  "GR105", "GR104", "GR103", "GR102", "GR101",
-  "GK005", "GK004", "GK003", "GK002", "GK001", "GK001(A)",
+  "중3",
+  "중2",
+  "중1",
+  "초6",
+  "GR105",
+  "GR104",
+  "GR103",
+  "GR102",
+  "GR101",
+  "GK005",
+  "GK004",
+  "GK003",
+  "GK002",
+  "GK001",
+  "GK001(A)",
 ];
 
 const gradeOptions = ["초등저학년", "초등고학년", "중등부"];
 const statusOptions = ["재원중", "휴원", "퇴원"];
+
+type Student = {
+  id: string;
+  name: string;
+  grade?: string;
+  level?: string;
+  status?: string;
+};
 
 export default function Home() {
   const SITE_PASSWORD = "1234";
@@ -22,9 +52,9 @@ export default function Home() {
   const [authorized, setAuthorized] = useState(false);
   const [password, setPassword] = useState("");
 
-  const [students, setStudents] = useState<any[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [selectedLevel, setSelectedLevel] = useState("전체");
-  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedMonth, setSelectedMonth] = useState("1월");
   const [content, setContent] = useState("");
   const [message, setMessage] = useState("");
@@ -35,13 +65,54 @@ export default function Home() {
   const [newLevel, setNewLevel] = useState("");
   const [newStatus, setNewStatus] = useState("재원중");
 
-  async function refreshStudents() {
-    const res = await fetch(`/api/students?ts=${Date.now()}`, {
-      cache: "no-store",
+  function normalizeName(name: string) {
+    return String(name || "").replace(/\s+/g, "").trim();
+  }
+
+  function getStudentKey(student: Student) {
+    return normalizeName(student?.name || "");
+  }
+
+  function uniqueStudentList(list: Student[]) {
+    const map = new Map<string, Student>();
+
+    (list || []).forEach((student) => {
+      if (!student?.name || !student?.level) return;
+
+      const key = getStudentKey(student);
+
+      if (!key) return;
+
+      if (!map.has(key)) {
+        map.set(key, student);
+      }
     });
 
-    const data = await res.json();
-    setStudents(data.students || []);
+    return Array.from(map.values()).sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""), "ko")
+    );
+  }
+
+  async function refreshStudents() {
+    try {
+      const res = await fetch(`/api/students?ts=${Date.now()}`, {
+        cache: "no-store",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setStudentAddMessage(
+          "학생 목록 불러오기 실패: " +
+            (data.detail || data.error || "알 수 없는 오류")
+        );
+        return;
+      }
+
+      setStudents(uniqueStudentList(data.students || []));
+    } catch (error: any) {
+      setStudentAddMessage("학생 목록 불러오기 실패: " + error.message);
+    }
   }
 
   useEffect(() => {
@@ -52,15 +123,19 @@ export default function Home() {
 
   const levels = ["전체", ...levelOptions];
 
+  const uniqueStudents = uniqueStudentList(students);
+
   const filteredStudents =
     selectedLevel === "전체"
-      ? students
-      : students.filter((student) => student.level === selectedLevel);
+      ? uniqueStudents
+      : uniqueStudents.filter((student) => student.level === selectedLevel);
 
   async function addStudent() {
     setStudentAddMessage("학생 추가 중...");
 
-    if (!newName.trim()) {
+    const cleanName = newName.trim();
+
+    if (!cleanName) {
       setStudentAddMessage("학생 이름을 입력해주세요.");
       return;
     }
@@ -70,14 +145,25 @@ export default function Home() {
       return;
     }
 
+    const alreadyExists = uniqueStudents.some(
+      (student) => normalizeName(student.name) === normalizeName(cleanName)
+    );
+
+    if (alreadyExists) {
+      setStudentAddMessage("이미 같은 이름의 학생이 목록에 있습니다.");
+      return;
+    }
+
     try {
+      const addedLevel = newLevel;
+
       const res = await fetch("/api/students/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: newName,
+          name: cleanName,
           grade: newGrade,
           level: newLevel,
           status: newStatus,
@@ -93,25 +179,57 @@ export default function Home() {
         return;
       }
 
-      const addedStudent = {
-        id: data.id || `temp-${Date.now()}`,
-        name: newName,
-        grade: newGrade,
-        level: newLevel,
-        status: newStatus,
-      };
+      await refreshStudents();
 
-      setStudents((prev) => [...prev, addedStudent]);
-      setSelectedLevel(newLevel);
+      setSelectedLevel(addedLevel);
 
       setNewName("");
       setNewLevel("");
       setNewGrade("초등저학년");
       setNewStatus("재원중");
 
-      setStudentAddMessage("학생 추가 완료! 목록에 바로 반영했습니다.");
+      setStudentAddMessage("학생 추가 완료! 목록을 다시 불러왔습니다.");
     } catch (error: any) {
       setStudentAddMessage("학생 추가 실패: " + error.message);
+    }
+  }
+
+  async function deleteStudent(student: Student) {
+    const ok = window.confirm(`${student.name} 학생을 삭제할까요?`);
+
+    if (!ok) return;
+
+    try {
+      const res = await fetch("/api/students", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: student.id,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setStudentAddMessage(
+          "학생 삭제 실패: " + (data.detail || data.error || "알 수 없는 오류")
+        );
+        return;
+      }
+
+      if (selectedStudent?.id === student.id) {
+        setSelectedStudent(null);
+        setContent("");
+        setMessage("");
+      }
+
+      await refreshStudents();
+
+      setStudentAddMessage(`${student.name} 학생을 삭제했습니다.`);
+    } catch (error: any) {
+      setStudentAddMessage("학생 삭제 실패: " + error.message);
     }
   }
 
@@ -119,7 +237,9 @@ export default function Home() {
     setMessage("불러오는 중...");
 
     const res = await fetch(
-      `/api/report?studentName=${encodeURIComponent(studentName)}&month=${encodeURIComponent(month)}&ts=${Date.now()}`,
+      `/api/report?studentName=${encodeURIComponent(
+        studentName
+      )}&month=${encodeURIComponent(month)}&ts=${Date.now()}`,
       { cache: "no-store" }
     );
 
@@ -150,7 +270,9 @@ export default function Home() {
     const previousMonth = months[currentIndex - 1];
 
     const res = await fetch(
-      `/api/report?studentName=${encodeURIComponent(selectedStudent.name)}&month=${encodeURIComponent(previousMonth)}&ts=${Date.now()}`,
+      `/api/report?studentName=${encodeURIComponent(
+        selectedStudent.name
+      )}&month=${encodeURIComponent(previousMonth)}&ts=${Date.now()}`,
       { cache: "no-store" }
     );
 
@@ -517,27 +639,52 @@ ${content}`;
       <h2>학생 목록</h2>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        {filteredStudents.map((student: any) => (
-          <button
-            key={student.id}
-            onClick={async () => {
-              setSelectedStudent(student);
-              setSelectedMonth("1월");
-              await loadReport(student.name, "1월");
-            }}
+        {filteredStudents.map((student: Student) => (
+          <div
+            key={getStudentKey(student)}
             style={{
-              padding: 12,
-              borderRadius: 8,
-              border:
-                selectedStudent?.id === student.id
-                  ? "2px solid black"
-                  : "1px solid #ccc",
-              background: "#fff",
-              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
             }}
           >
-            {student.name || "이름없음"}
-          </button>
+            <button
+              onClick={async () => {
+                setSelectedStudent(student);
+                setSelectedMonth("1월");
+                await loadReport(student.name, "1월");
+              }}
+              style={{
+                padding: 12,
+                borderRadius: 8,
+                border:
+                  selectedStudent?.id === student.id
+                    ? "2px solid black"
+                    : "1px solid #ccc",
+                background: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              {student.name || "이름없음"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => deleteStudent(student)}
+              style={{
+                padding: "10px 8px",
+                borderRadius: 8,
+                border: "1px solid #ffb3b3",
+                background: "#fff5f5",
+                color: "#d11",
+                cursor: "pointer",
+                fontSize: 12,
+              }}
+              title="학생 삭제"
+            >
+              삭제
+            </button>
+          </div>
         ))}
       </div>
 
