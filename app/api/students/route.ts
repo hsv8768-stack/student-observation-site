@@ -25,6 +25,27 @@ async function notionFetch(path: string, body?: any) {
   return data;
 }
 
+async function notionPatch(path: string, body: any) {
+  const res = await fetch(`https://api.notion.com/v1${path}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${NOTION_TOKEN}`,
+      "Content-Type": "application/json",
+      "Notion-Version": "2022-06-28",
+    },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.message || "Notion API 수정 오류");
+  }
+
+  return data;
+}
+
 function getText(property: any) {
   if (!property) return "";
 
@@ -45,6 +66,10 @@ function getText(property: any) {
   }
 
   return "";
+}
+
+function normalizeName(name: string) {
+  return String(name || "").replace(/\s+/g, "").trim();
 }
 
 export async function GET() {
@@ -93,15 +118,7 @@ export async function GET() {
     const uniqueStudents = Array.from(
       new Map(
         rawStudents.map((student: any) => {
-          const key = [
-            student.name,
-            student.grade,
-            student.level,
-            student.status,
-          ]
-            .join("__")
-            .toLowerCase();
-
+          const key = normalizeName(student.name);
           return [key, student];
         })
       ).values()
@@ -116,6 +133,39 @@ export async function GET() {
     return NextResponse.json(
       {
         error: "학생 목록을 불러오지 못했습니다.",
+        detail: error.message,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json();
+    const id = body?.id;
+
+    if (!id) {
+      return NextResponse.json(
+        {
+          error: "삭제할 학생 ID가 없습니다.",
+        },
+        { status: 400 }
+      );
+    }
+
+    await notionPatch(`/pages/${id}`, {
+      archived: true,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      message: "학생을 삭제했습니다.",
+    });
+  } catch (error: any) {
+    return NextResponse.json(
+      {
+        error: "학생 삭제에 실패했습니다.",
         detail: error.message,
       },
       { status: 500 }
