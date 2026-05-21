@@ -55,6 +55,8 @@ export default function Home() {
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedLevel, setSelectedLevel] = useState("전체");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [deleteMode, setDeleteMode] = useState(false);
+
   const [selectedMonth, setSelectedMonth] = useState("1월");
   const [content, setContent] = useState("");
   const [message, setMessage] = useState("");
@@ -195,7 +197,9 @@ export default function Home() {
   }
 
   async function deleteStudent(student: Student) {
-    const ok = window.confirm(`${student.name} 학생을 삭제할까요?`);
+    const ok = window.confirm(
+      `${student.name} 학생을 삭제할까요?\n\n노션에서는 휴지통으로 이동됩니다.`
+    );
 
     if (!ok) return;
 
@@ -636,16 +640,51 @@ ${content}`;
         ))}
       </div>
 
-      <h2>학생 목록</h2>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          marginBottom: 12,
+        }}
+      >
+        <h2 style={{ margin: 0 }}>학생 목록</h2>
 
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <button
+          type="button"
+          onClick={() => setDeleteMode((prev) => !prev)}
+          style={{
+            padding: "8px 12px",
+            borderRadius: 8,
+            border: deleteMode ? "2px solid #d11" : "1px solid #ccc",
+            background: deleteMode ? "#fff5f5" : "#fff",
+            color: deleteMode ? "#d11" : "#333",
+            cursor: "pointer",
+            fontWeight: deleteMode ? "bold" : "normal",
+          }}
+        >
+          {deleteMode ? "삭제 모드 끄기" : "삭제 모드 켜기"}
+        </button>
+
+        {deleteMode && (
+          <span style={{ color: "#d11", fontWeight: "bold", fontSize: 14 }}>
+            삭제 버튼이 활성화되었습니다.
+          </span>
+        )}
+      </div>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {filteredStudents.map((student: Student) => (
           <div
             key={getStudentKey(student)}
             style={{
               display: "inline-flex",
               alignItems: "center",
-              gap: 4,
+              gap: 8,
+              padding: deleteMode ? 6 : 0,
+              borderRadius: 10,
+              background: deleteMode ? "#fafafa" : "transparent",
+              border: deleteMode ? "1px dashed #ddd" : "none",
             }}
           >
             <button
@@ -655,7 +694,7 @@ ${content}`;
                 await loadReport(student.name, "1월");
               }}
               style={{
-                padding: 12,
+                padding: "12px 16px",
                 borderRadius: 8,
                 border:
                   selectedStudent?.id === student.id
@@ -663,27 +702,30 @@ ${content}`;
                     : "1px solid #ccc",
                 background: "#fff",
                 cursor: "pointer",
+                fontWeight: "bold",
               }}
             >
               {student.name || "이름없음"}
             </button>
 
-            <button
-              type="button"
-              onClick={() => deleteStudent(student)}
-              style={{
-                padding: "10px 8px",
-                borderRadius: 8,
-                border: "1px solid #ffb3b3",
-                background: "#fff5f5",
-                color: "#d11",
-                cursor: "pointer",
-                fontSize: 12,
-              }}
-              title="학생 삭제"
-            >
-              삭제
-            </button>
+            {deleteMode && (
+              <button
+                type="button"
+                onClick={() => deleteStudent(student)}
+                style={{
+                  padding: "6px 8px",
+                  borderRadius: 6,
+                  border: "1px solid #ffb3b3",
+                  background: "#fff5f5",
+                  color: "#d11",
+                  cursor: "pointer",
+                  fontSize: 11,
+                }}
+                title="학생 삭제"
+              >
+                삭제
+              </button>
+            )}
           </div>
         ))}
       </div>
