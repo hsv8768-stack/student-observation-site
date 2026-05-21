@@ -40,38 +40,78 @@ function getText(property: any) {
     return property.select?.name || "";
   }
 
+  if (property.type === "multi_select") {
+    return property.multi_select?.map((s: any) => s.name).join(", ") || "";
+  }
+
   return "";
 }
 
 export async function GET() {
   try {
-    const response = await notionFetch("/search", {
-      filter: {
-        property: "object",
-        value: "page",
-      },
-      page_size: 100,
-    });
+    let allResults: any[] = [];
+    let hasMore = true;
+    let startCursor: string | undefined = undefined;
 
-    const students = response.results
+    while (hasMore) {
+      const response: any = await notionFetch("/search", {
+        filter: {
+          property: "object",
+          value: "page",
+        },
+        page_size: 100,
+        start_cursor: startCursor,
+      });
+
+      allResults = [...allResults, ...(response.results || [])];
+
+      hasMore = response.has_more;
+      startCursor = response.next_cursor || undefined;
+    }
+
+    const rawStudents = allResults
       .map((page: any) => {
         const props = page.properties || {};
 
+        const name = getText(props["이름"]).trim();
+        const grade = getText(props["학년"]).trim();
+        const level = getText(props["레벨"]).trim();
+        const status = getText(props["상태"]).trim();
+
         return {
           id: page.id,
-          name: getText(props["이름"]),
-          grade: getText(props["학년"]),
-          level: getText(props["레벨"]),
-          status: getText(props["상태"]),
+          name,
+          grade,
+          level,
+          status,
         };
       })
-      .filter((student: any) => student.name && student.level);
+      .filter((student: any) => {
+        return student.name && student.level;
+      });
 
-    students.sort((a: any, b: any) => {
+    const uniqueStudents = Array.from(
+      new Map(
+        rawStudents.map((student: any) => {
+          const key = [
+            student.name,
+            student.grade,
+            student.level,
+            student.status,
+          ]
+            .join("__")
+            .toLowerCase();
+
+          return [key, student];
+        })
+      ).values()
+    );
+
+    uniqueStudents.sort((a: any, b: any) => {
       return a.name.localeCompare(b.name, "ko");
     });
 
-    return NextResponse.json({ students });
+    return NextResponse.json({ students: uniqueStudents });
   } catch (error: any) {
     return NextResponse.json(
       {
