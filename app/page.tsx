@@ -181,8 +181,15 @@ export default function Home() {
         return;
       }
 
-      await refreshStudents();
+      const addedStudent: Student = {
+        id: data.id || `temp-${Date.now()}`,
+        name: cleanName,
+        grade: newGrade,
+        level: newLevel,
+        status: newStatus,
+      };
 
+      setStudents((prev) => uniqueStudentList([...prev, addedStudent]));
       setSelectedLevel(addedLevel);
 
       setNewName("");
@@ -190,7 +197,7 @@ export default function Home() {
       setNewGrade("초등저학년");
       setNewStatus("재원중");
 
-      setStudentAddMessage("학생 추가 완료! 목록을 다시 불러왔습니다.");
+      setStudentAddMessage("학생 추가 완료! 목록에 바로 반영했습니다.");
     } catch (error: any) {
       setStudentAddMessage("학생 추가 실패: " + error.message);
     }
