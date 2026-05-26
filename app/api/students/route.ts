@@ -140,6 +140,78 @@ export async function GET() {
   }
 }
 
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+
+    const id = body?.id;
+    const level = body?.level;
+    const grade = body?.grade;
+    const status = body?.status;
+
+    if (!id) {
+      return NextResponse.json(
+        {
+          error: "수정할 학생 ID가 없습니다.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const properties: any = {};
+
+    if (level) {
+      properties["레벨"] = {
+        select: {
+          name: level,
+        },
+      };
+    }
+
+    if (grade) {
+      properties["학년"] = {
+        select: {
+          name: grade,
+        },
+      };
+    }
+
+    if (status) {
+      properties["상태"] = {
+        select: {
+          name: status,
+        },
+      };
+    }
+
+    if (Object.keys(properties).length === 0) {
+      return NextResponse.json(
+        {
+          error: "수정할 항목이 없습니다.",
+        },
+        { status: 400 }
+      );
+    }
+
+    await notionPatch(`/pages/${id}`, {
+      properties,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      message: "학생 정보가 수정되었습니다.",
+    });
+  } catch (error: any) {
+    return NextResponse.json(
+      {
+        error: "학생 정보 수정에 실패했습니다.",
+        detail: error.message,
+      },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(request: Request) {
   try {
     const body = await request.json();
