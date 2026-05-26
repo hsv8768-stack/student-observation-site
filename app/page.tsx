@@ -55,7 +55,12 @@ export default function Home() {
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedLevel, setSelectedLevel] = useState("전체");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+
   const [deleteMode, setDeleteMode] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editingLevels, setEditingLevels] = useState<Record<string, string>>(
+    {}
+  );
 
   const [selectedMonth, setSelectedMonth] = useState("1월");
   const [content, setContent] = useState("");
@@ -241,6 +246,79 @@ export default function Home() {
       setStudentAddMessage(`${student.name} 학생을 삭제했습니다.`);
     } catch (error: any) {
       setStudentAddMessage("학생 삭제 실패: " + error.message);
+    }
+  }
+
+  async function updateStudentLevel(student: Student) {
+    const newStudentLevel = editingLevels[student.id] || student.level || "";
+
+    if (!newStudentLevel) {
+      setStudentAddMessage("변경할 반을 선택해주세요.");
+      return;
+    }
+
+    if (newStudentLevel === student.level) {
+      setStudentAddMessage(
+        `${student.name} 학생은 이미 ${newStudentLevel} 반입니다.`
+      );
+      return;
+    }
+
+    const ok = window.confirm(
+      `${student.name} 학생의 반을 변경할까요?\n\n현재: ${
+        student.level || "미지정"
+      }\n변경: ${newStudentLevel}\n\n저장하면 노션 학생목록 DB에도 반영됩니다.`
+    );
+
+    if (!ok) return;
+
+    try {
+      setStudentAddMessage(`${student.name} 학생 반 수정 중...`);
+
+      const res = await fetch("/api/students", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: student.id,
+          level: newStudentLevel,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setStudentAddMessage(
+          "반 수정 실패: " + (data.detail || data.error || "알 수 없는 오류")
+        );
+        return;
+      }
+
+      setStudents((prev) =>
+        uniqueStudentList(
+          prev.map((item) =>
+            item.id === student.id ? { ...item, level: newStudentLevel } : item
+          )
+        )
+      );
+
+      if (selectedStudent?.id === student.id) {
+        setSelectedStudent({
+          ...selectedStudent,
+          level: newStudentLevel,
+        });
+      }
+
+      setSelectedLevel(newStudentLevel);
+
+      await refreshStudents();
+
+      setStudentAddMessage(
+        `${student.name} 학생의 반을 ${newStudentLevel}로 수정했습니다.`
+      );
+    } catch (error: any) {
+      setStudentAddMessage("반 수정 실패: " + error.message);
     }
   }
 
@@ -653,13 +731,17 @@ ${content}`;
           alignItems: "center",
           gap: 12,
           marginBottom: 12,
+          flexWrap: "wrap",
         }}
       >
         <h2 style={{ margin: 0 }}>학생 목록</h2>
 
         <button
           type="button"
-          onClick={() => setDeleteMode((prev) => !prev)}
+          onClick={() => {
+            setDeleteMode((prev) => !prev);
+            setEditMode(false);
+          }}
           style={{
             padding: "8px 12px",
             borderRadius: 8,
@@ -673,9 +755,34 @@ ${content}`;
           {deleteMode ? "삭제 모드 끄기" : "삭제 모드 켜기"}
         </button>
 
+        <button
+          type="button"
+          onClick={() => {
+            setEditMode((prev) => !prev);
+            setDeleteMode(false);
+          }}
+          style={{
+            padding: "8px 12px",
+            borderRadius: 8,
+            border: editMode ? "2px solid #2563eb" : "1px solid #ccc",
+            background: editMode ? "#eff6ff" : "#fff",
+            color: editMode ? "#1d4ed8" : "#333",
+            cursor: "pointer",
+            fontWeight: editMode ? "bold" : "normal",
+          }}
+        >
+          {editMode ? "반 수정 모드 끄기" : "반 수정 모드 켜기"}
+        </button>
+
         {deleteMode && (
           <span style={{ color: "#d11", fontWeight: "bold", fontSize: 14 }}>
             삭제 버튼이 활성화되었습니다.
+          </span>
+        )}
+
+        {editMode && (
+          <span style={{ color: "#1d4ed8", fontWeight: "bold", fontSize: 14 }}>
+            반 수정 후 저장하면 노션에도 반영됩니다.
           </span>
         )}
       </div>
@@ -688,10 +795,18 @@ ${content}`;
               display: "inline-flex",
               alignItems: "center",
               gap: 8,
-              padding: deleteMode ? 6 : 0,
+              padding: deleteMode || editMode ? 6 : 0,
               borderRadius: 10,
-              background: deleteMode ? "#fafafa" : "transparent",
-              border: deleteMode ? "1px dashed #ddd" : "none",
+              background: editMode
+                ? "#eff6ff"
+                : deleteMode
+                ? "#fafafa"
+                : "transparent",
+              border: editMode
+                ? "1px dashed #93c5fd"
+                : deleteMode
+                ? "1px dashed #ddd"
+                : "none",
             }}
           >
             <button
@@ -714,6 +829,60 @@ ${content}`;
             >
               {student.name || "이름없음"}
             </button>
+
+            {editMode && (
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: 6,
+                  borderRadius: 8,
+                  background: "#ffffff",
+                  border: "1px solid #bfdbfe",
+                }}
+              >
+                <select
+                  value={editingLevels[student.id] || student.level || ""}
+                  onChange={(e) =>
+                    setEditingLevels((prev) => ({
+                      ...prev,
+                      [student.id]: e.target.value,
+                    }))
+                  }
+                  style={{
+                    width: 115,
+                    padding: "7px 8px",
+                    borderRadius: 8,
+                    border: "1px solid #93c5fd",
+                    fontSize: 12,
+                  }}
+                >
+                  {levelOptions.map((level) => (
+                    <option key={level} value={level}>
+                      {level}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => updateStudentLevel(student)}
+                  style={{
+                    padding: "7px 9px",
+                    borderRadius: 8,
+                    border: "1px solid #2563eb",
+                    background: "#2563eb",
+                    color: "white",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    fontWeight: "bold",
+                  }}
+                >
+                  저장
+                </button>
+              </div>
+            )}
 
             {deleteMode && (
               <button
