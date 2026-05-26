@@ -30,8 +30,9 @@ const levelOptions = [
   "GK005",
   "GK004",
   "GK003",
-  "GK002",
-  "GK001",
+  "GK002(B)",
+  "GK002(A)",
+  "GK001(B)",
   "GK001(A)",
 ];
 
