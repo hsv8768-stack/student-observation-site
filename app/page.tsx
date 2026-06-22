@@ -23,6 +23,7 @@ const levelOptions = [
   "중1",
   "초6 월수목CK",
   "초6 화수금CK",
+  "GR201",
   "GR105",
   "GR104",
   "GR103",
