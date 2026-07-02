@@ -70,6 +70,11 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [studentAddMessage, setStudentAddMessage] = useState("");
 
+  const [exportMonth, setExportMonth] = useState("1월");
+  const [exportLevel, setExportLevel] = useState("전체");
+  const [exportMessage, setExportMessage] = useState("");
+  const [exportLoading, setExportLoading] = useState(false);
+
   const [newName, setNewName] = useState("");
   const [newGrade, setNewGrade] = useState("초등저학년");
   const [newLevel, setNewLevel] = useState("");
@@ -90,7 +95,6 @@ export default function Home() {
       if (!student?.name || !student?.level) return;
 
       const key = getStudentKey(student);
-
       if (!key) return;
 
       if (!map.has(key)) {
@@ -132,13 +136,171 @@ export default function Home() {
   }, [authorized]);
 
   const levels = ["전체", ...levelOptions];
-
   const uniqueStudents = uniqueStudentList(students);
 
   const filteredStudents =
     selectedLevel === "전체"
       ? uniqueStudents
       : uniqueStudents.filter((student) => student.level === selectedLevel);
+
+  function escapeExcelHtml(value: any) {
+    const text = String(value ?? "");
+    const safeText = /^[=+\-@]/.test(text.trim()) ? `'${text}` : text;
+
+    return safeText
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;")
+      .replace(/\n/g, "<br />");
+  }
+
+  function safeFilePart(value: string) {
+    return String(value || "")
+      .replace(/[\\/:*?"<>|]/g, "_")
+      .replace(/\s+/g, "_")
+      .trim();
+  }
+
+  async function exportMonthlyReports() {
+    const targetStudents =
+      exportLevel === "전체"
+        ? uniqueStudents
+        : uniqueStudents.filter((student) => student.level === exportLevel);
+
+    if (!targetStudents.length) {
+      setExportMessage("내보낼 학생이 없습니다. 레벨을 다시 선택해주세요.");
+      return;
+    }
+
+    setExportLoading(true);
+    setExportMessage("월별 관찰일지 파일을 만드는 중입니다...");
+
+    try {
+      const rows = [];
+
+      for (const student of targetStudents) {
+        const res = await fetch(
+          `/api/report?studentName=${encodeURIComponent(
+            student.name
+          )}&month=${encodeURIComponent(exportMonth)}&ts=${Date.now()}`,
+          { cache: "no-store" }
+        );
+
+        const data = await res.json();
+
+        rows.push({
+          name: student.name || "",
+          grade: student.grade || "",
+          level: student.level || "",
+          status: student.status || "",
+          month: exportMonth,
+          exists: data.exists ? "저장됨" : "미작성",
+          content: data.exists ? data.content || "" : "",
+        });
+      }
+
+      const year = new Date().getFullYear();
+      const monthNumber = String(months.indexOf(exportMonth) + 1).padStart(
+        2,
+        "0"
+      );
+
+      const levelPart =
+        exportLevel === "전체" ? "전체" : safeFilePart(exportLevel);
+
+      const fileName = `${year}-${monthNumber}_${levelPart}_모스트영어_관찰일지.xls`;
+
+      const tableRows = rows
+        .map(
+          (row, index) => `
+            <tr>
+              <td>${index + 1}</td>
+              <td>${escapeExcelHtml(row.name)}</td>
+              <td>${escapeExcelHtml(row.grade)}</td>
+              <td>${escapeExcelHtml(row.level)}</td>
+              <td>${escapeExcelHtml(row.status)}</td>
+              <td>${escapeExcelHtml(row.month)}</td>
+              <td>${escapeExcelHtml(row.exists)}</td>
+              <td style="mso-number-format:'@'; white-space:normal;">${escapeExcelHtml(
+                row.content
+              )}</td>
+            </tr>`
+        )
+        .join("");
+
+      const excelHtml = `
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <style>
+              body { font-family: Arial, sans-serif; }
+              h2 { margin: 0 0 12px; }
+              table { border-collapse: collapse; width: 100%; }
+              th, td {
+                border: 1px solid #999;
+                padding: 8px;
+                vertical-align: top;
+              }
+              th {
+                background: #f2f2f2;
+                font-weight: bold;
+                text-align: center;
+              }
+              td {
+                mso-number-format:'@';
+              }
+            </style>
+          </head>
+          <body>
+            <h2>${year}년 ${escapeExcelHtml(exportMonth)} ${escapeExcelHtml(
+        levelPart
+      )} 모스트영어 관찰일지</h2>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>번호</th>
+                  <th>학생명</th>
+                  <th>학년구분</th>
+                  <th>레벨/반</th>
+                  <th>상태</th>
+                  <th>월</th>
+                  <th>작성 여부</th>
+                  <th>관찰일지 / 학부모 피드백톡</th>
+                </tr>
+              </thead>
+              <tbody>${tableRows}</tbody>
+            </table>
+          </body>
+        </html>`;
+
+      const blob = new Blob([`\ufeff${excelHtml}`], {
+        type: "application/vnd.ms-excel;charset=utf-8;",
+      });
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = fileName;
+
+      document.body.appendChild(link);
+      link.click();
+
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setExportMessage(
+        `${exportMonth} ${exportLevel} 관찰일지 ${rows.length}명 파일을 다운로드했습니다.`
+      );
+    } catch (error: any) {
+      setExportMessage("월별 관찰일지 내보내기 실패: " + error.message);
+    } finally {
+      setExportLoading(false);
+    }
+  }
 
   async function addStudent() {
     setStudentAddMessage("학생 추가 중...");
@@ -726,6 +888,72 @@ ${content}`;
             {level}
           </button>
         ))}
+      </div>
+
+      <div
+        style={{
+          padding: 18,
+          border: "1px solid #ddd",
+          borderRadius: 14,
+          background: "#fafafa",
+          marginBottom: 24,
+        }}
+      >
+        <h2 style={{ marginTop: 0 }}>월별 관찰일지 내보내기</h2>
+
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          <select
+            value={exportMonth}
+            onChange={(e) => setExportMonth(e.target.value)}
+            style={{ padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
+          >
+            {months.map((month) => (
+              <option key={month} value={month}>
+                {month}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={exportLevel}
+            onChange={(e) => setExportLevel(e.target.value)}
+            style={{ padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
+          >
+            {levels.map((level) => (
+              <option key={level} value={level}>
+                {level}
+              </option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            onClick={exportMonthlyReports}
+            disabled={exportLoading}
+            style={{
+              padding: "10px 16px",
+              borderRadius: 10,
+              border: "none",
+              background: exportLoading ? "#999" : "#111827",
+              color: "white",
+              cursor: exportLoading ? "not-allowed" : "pointer",
+              fontWeight: "bold",
+            }}
+          >
+            {exportLoading ? "파일 만드는 중..." : "📁 월별 관찰일지 내보내기"}
+          </button>
+        </div>
+
+        <p style={{ marginBottom: 0, color: "#2563eb", fontWeight: "bold" }}>
+          {exportMessage}
+        </p>
       </div>
 
       <div
