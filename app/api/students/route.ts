@@ -2,245 +2,305 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const NOTION_TOKEN = process.env.NOTION_TOKEN!;
+const NOTION_VERSION = "2022-06-28";
 
-async function notionFetch(path: string, body?: any) {
+function json(data: any, status = 200) {
+  return NextResponse.json(data, { status });
+}
+
+function getEnv() {
+  const token = process.env.NOTION_TOKEN;
+  const databaseId = process.env.NOTION_STUDENTS_DB_ID;
+
+  if (!token) {
+    throw new Error("NOTION_TOKEN 환경변수가 설정되어 있지 않습니다.");
+  }
+
+  if (!databaseId) {
+    throw new Error("NOTION_STUDENTS_DB_ID 환경변수가 설정되어 있지 않습니다.");
+  }
+
+  return { token, databaseId };
+}
+
+async function notionRequest(path: string, options: RequestInit = {}) {
+  const { token } = getEnv();
+
   const res = await fetch(`https://api.notion.com/v1${path}`, {
-    method: body ? "POST" : "GET",
+    ...options,
     headers: {
-      Authorization: `Bearer ${NOTION_TOKEN}`,
+      Authorization: `Bearer ${token}`,
+      "Notion-Version": NOTION_VERSION,
       "Content-Type": "application/json",
-      "Notion-Version": "2022-06-28",
+      ...(options.headers || {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
     cache: "no-store",
   });
 
-  const data = await res.json();
+  const text = await res.text();
+
+  let data: any = null;
+
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(`Notion 응답을 JSON으로 읽지 못했습니다: ${text.slice(0, 200)}`);
+  }
 
   if (!res.ok) {
-    throw new Error(data.message || "Notion API 오류");
+    throw new Error(data.message || data.error || `Notion API 오류: ${res.status}`);
   }
 
   return data;
 }
 
-async function notionPatch(path: string, body: any) {
-  const res = await fetch(`https://api.notion.com/v1${path}`, {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${NOTION_TOKEN}`,
-      "Content-Type": "application/json",
-      "Notion-Version": "2022-06-28",
-    },
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
+function propToText(prop: any) {
+  if (!prop) return "";
 
-  const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data.message || "Notion API 수정 오류");
+  if (prop.type === "title") {
+    return (prop.title || []).map((t: any) => t.plain_text || "").join("");
   }
 
-  return data;
-}
-
-function getText(property: any) {
-  if (!property) return "";
-
-  if (property.type === "title") {
-    return property.title?.map((t: any) => t.plain_text).join("") || "";
+  if (prop.type === "rich_text") {
+    return (prop.rich_text || []).map((t: any) => t.plain_text || "").join("");
   }
 
-  if (property.type === "rich_text") {
-    return property.rich_text?.map((t: any) => t.plain_text).join("") || "";
+  if (prop.type === "select") {
+    return prop.select?.name || "";
   }
 
-  if (property.type === "select") {
-    return property.select?.name || "";
+  if (prop.type === "status") {
+    return prop.status?.name || "";
   }
 
-  if (property.type === "multi_select") {
-    return property.multi_select?.map((s: any) => s.name).join(", ") || "";
+  if (prop.type === "multi_select") {
+    return (prop.multi_select || []).map((x: any) => x.name).join(", ");
+  }
+
+  if (prop.type === "number") {
+    return prop.number == null ? "" : String(prop.number);
+  }
+
+  if (prop.type === "phone_number") {
+    return prop.phone_number || "";
+  }
+
+  if (prop.type === "email") {
+    return prop.email || "";
+  }
+
+  if (prop.type === "url") {
+    return prop.url || "";
+  }
+
+  if (prop.type === "formula") {
+    const formula = prop.formula;
+    if (!formula) return "";
+    if (formula.type === "string") return formula.string || "";
+    if (formula.type === "number") return formula.number == null ? "" : String(formula.number);
+    if (formula.type === "boolean") return formula.boolean ? "true" : "false";
+    if (formula.type === "date") return formula.date?.start || "";
   }
 
   return "";
 }
 
-function normalizeName(name: string) {
-  return String(name || "").replace(/\s+/g, "").trim();
+function findProperty(properties: any, names: string[]) {
+  for (const name of names) {
+    if (properties[name]) return properties[name];
+  }
+
+  return null;
+}
+
+function findTitleProperty(properties: any) {
+  const direct = findProperty(properties, ["이름", "학생명", "Name", "name"]);
+  if (direct) return direct;
+
+  const entry = Object.entries(properties).find(
+    ([, value]: any) => value?.type === "title"
+  );
+
+  return entry ? entry[1] : null;
+}
+
+function parseStudent(page: any) {
+  const properties = page.properties || {};
+
+  const name = propToText(findTitleProperty(properties));
+  const grade = propToText(
+    findProperty(properties, ["학년", "학년구분", "Grade", "grade"])
+  );
+  const level = propToText(
+    findProperty(properties, ["레벨", "반", "레벨/반", "Level", "level"])
+  );
+  const status = propToText(
+    findProperty(properties, ["상태", "Status", "status"])
+  );
+
+  return {
+    id: page.id,
+    name,
+    grade,
+    level,
+    status,
+  };
 }
 
 export async function GET() {
   try {
-    let allResults: any[] = [];
+    const { databaseId } = getEnv();
+
+    const students: any[] = [];
     let hasMore = true;
-    let startCursor: string | undefined = undefined;
+    let startCursor: string | null = null;
 
     while (hasMore) {
-      const response: any = await notionFetch("/search", {
-        filter: {
-          property: "object",
-          value: "page",
-        },
+      const body: any = {
         page_size: 100,
-        start_cursor: startCursor,
+      };
+
+      if (startCursor) {
+        body.start_cursor = startCursor;
+      }
+
+      const data = await notionRequest(`/databases/${databaseId}/query`, {
+        method: "POST",
+        body: JSON.stringify(body),
       });
 
-      allResults = [...allResults, ...(response.results || [])];
+      const results = data.results || [];
 
-      hasMore = response.has_more;
-      startCursor = response.next_cursor || undefined;
+      results.forEach((page: any) => {
+        const student = parseStudent(page);
+
+        if (student.name) {
+          students.push(student);
+        }
+      });
+
+      hasMore = !!data.has_more;
+      startCursor = data.next_cursor || null;
     }
 
-    const rawStudents = allResults
-      .map((page: any) => {
-        const props = page.properties || {};
-
-        const name = getText(props["이름"]).trim();
-        const grade = getText(props["학년"]).trim();
-        const level = getText(props["레벨"]).trim();
-        const status = getText(props["상태"]).trim();
-
-        return {
-          id: page.id,
-          name,
-          grade,
-          level,
-          status,
-        };
-      })
-      .filter((student: any) => {
-        return student.name && student.level;
-      });
-
-    const uniqueStudents = Array.from(
-      new Map(
-        rawStudents.map((student: any) => {
-          const key = normalizeName(student.name);
-          return [key, student];
-        })
-      ).values()
+    students.sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""), "ko")
     );
 
-    uniqueStudents.sort((a: any, b: any) => {
-      return a.name.localeCompare(b.name, "ko");
+    return json({
+      ok: true,
+      students,
     });
-
-    return NextResponse.json({ students: uniqueStudents });
   } catch (error: any) {
-    return NextResponse.json(
+    return json(
       {
-        error: "학생 목록을 불러오지 못했습니다.",
-        detail: error.message,
+        ok: false,
+        error: "학생 목록 불러오기 실패",
+        detail: error?.message || String(error),
       },
-      { status: 500 }
+      500
     );
   }
 }
 
-export async function PATCH(request: Request) {
+export async function PATCH(req: Request) {
   try {
-    const body = await request.json();
-
-    const id = body?.id;
-    const level = body?.level;
-    const grade = body?.grade;
-    const status = body?.status;
+    const body = await req.json();
+    const { id, level, grade, status } = body;
 
     if (!id) {
-      return NextResponse.json(
+      return json(
         {
-          error: "수정할 학생 ID가 없습니다.",
+          ok: false,
+          error: "수정할 학생 id가 없습니다.",
         },
-        { status: 400 }
+        400
       );
     }
 
     const properties: any = {};
 
-    if (level) {
+    if (level !== undefined) {
       properties["레벨"] = {
         select: {
-          name: level,
+          name: String(level),
         },
       };
     }
 
-    if (grade) {
+    if (grade !== undefined) {
       properties["학년"] = {
         select: {
-          name: grade,
+          name: String(grade),
         },
       };
     }
 
-    if (status) {
+    if (status !== undefined) {
       properties["상태"] = {
         select: {
-          name: status,
+          name: String(status),
         },
       };
     }
 
-    if (Object.keys(properties).length === 0) {
-      return NextResponse.json(
-        {
-          error: "수정할 항목이 없습니다.",
-        },
-        { status: 400 }
-      );
-    }
-
-    await notionPatch(`/pages/${id}`, {
-      properties,
+    await notionRequest(`/pages/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        properties,
+      }),
     });
 
-    return NextResponse.json({
+    return json({
       ok: true,
-      message: "학생 정보가 수정되었습니다.",
+      message: "학생 정보 수정 완료",
     });
   } catch (error: any) {
-    return NextResponse.json(
+    return json(
       {
-        error: "학생 정보 수정에 실패했습니다.",
-        detail: error.message,
+        ok: false,
+        error: "학생 정보 수정 실패",
+        detail: error?.message || String(error),
       },
-      { status: 500 }
+      500
     );
   }
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE(req: Request) {
   try {
-    const body = await request.json();
-    const id = body?.id;
+    const body = await req.json();
+    const { id } = body;
 
     if (!id) {
-      return NextResponse.json(
+      return json(
         {
-          error: "삭제할 학생 ID가 없습니다.",
+          ok: false,
+          error: "삭제할 학생 id가 없습니다.",
         },
-        { status: 400 }
+        400
       );
     }
 
-    await notionPatch(`/pages/${id}`, {
-      archived: true,
+    await notionRequest(`/pages/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        archived: true,
+      }),
     });
 
-    return NextResponse.json({
+    return json({
       ok: true,
-      message: "학생을 삭제했습니다.",
+      message: "학생 삭제 완료",
     });
   } catch (error: any) {
-    return NextResponse.json(
+    return json(
       {
-        error: "학생 삭제에 실패했습니다.",
-        detail: error.message,
+        ok: false,
+        error: "학생 삭제 실패",
+        detail: error?.message || String(error),
       },
-      { status: 500 }
+      500
     );
   }
 }
