@@ -49,6 +49,11 @@ type Student = {
   status?: string;
 };
 
+type LocalDraft = {
+  content: string;
+  savedAt: string;
+};
+
 export default function Home() {
   const SITE_PASSWORD = "1234";
 
@@ -67,8 +72,13 @@ export default function Home() {
 
   const [selectedMonth, setSelectedMonth] = useState("1월");
   const [content, setContent] = useState("");
+  const [lastSavedContent, setLastSavedContent] = useState("");
+
   const [message, setMessage] = useState("");
   const [studentAddMessage, setStudentAddMessage] = useState("");
+
+  const [loadingReport, setLoadingReport] = useState(false);
+  const [savingReport, setSavingReport] = useState(false);
 
   const [exportMonth, setExportMonth] = useState("1월");
   const [exportLevel, setExportLevel] = useState("전체");
@@ -107,13 +117,108 @@ export default function Home() {
     );
   }
 
+  const levels = ["전체", ...levelOptions];
+
+  const uniqueStudents = uniqueStudentList(students);
+
+  const filteredStudents =
+    selectedLevel === "전체"
+      ? uniqueStudents
+      : uniqueStudents.filter((student) => student.level === selectedLevel);
+
+  async function parseJsonSafely(res: Response) {
+    const text = await res.text();
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(
+        `API가 JSON이 아니라 다른 화면을 반환했습니다. 상태코드: ${res.status}`
+      );
+    }
+  }
+
+  function getDraftKey(studentName: string, month: string) {
+    return `most_report_draft_${normalizeName(studentName)}_${month}`;
+  }
+
+  function saveLocalDraft(studentName: string, month: string, value: string) {
+    if (!studentName || !month) return;
+
+    try {
+      localStorage.setItem(
+        getDraftKey(studentName, month),
+        JSON.stringify({
+          content: value,
+          savedAt: new Date().toISOString(),
+        })
+      );
+    } catch {}
+  }
+
+  function loadLocalDraftData(studentName: string, month: string): LocalDraft | null {
+    try {
+      const raw = localStorage.getItem(getDraftKey(studentName, month));
+      if (!raw) return null;
+
+      const data = JSON.parse(raw);
+
+      if (!data?.content) return null;
+
+      return {
+        content: data.content || "",
+        savedAt: data.savedAt || "",
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function clearLocalDraft(studentName: string, month: string) {
+    try {
+      localStorage.removeItem(getDraftKey(studentName, month));
+    } catch {}
+  }
+
+  function hasUnsavedContent() {
+    return !!selectedStudent && !!content.trim() && content !== lastSavedContent;
+  }
+
+  function confirmMoveIfUnsaved() {
+    if (!hasUnsavedContent()) return true;
+
+    return window.confirm(
+      "현재 작성 중인 내용이 저장되지 않았을 수 있습니다.\n\n작성 내용은 브라우저에 임시저장되어 있지만, 안전하게 저장 버튼을 먼저 누르는 것을 권장합니다.\n그래도 이동할까요?"
+    );
+  }
+
+  function escapeExcelHtml(value: any) {
+    const text = String(value ?? "");
+    const safeText = /^[=+\-@]/.test(text.trim()) ? `'${text}` : text;
+
+    return safeText
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;")
+      .replace(/\n/g, "<br />");
+  }
+
+  function safeFilePart(value: string) {
+    return String(value || "")
+      .replace(/[\\/:*?"<>|]/g, "_")
+      .replace(/\s+/g, "_")
+      .trim();
+  }
+
   async function refreshStudents() {
     try {
       const res = await fetch(`/api/students?ts=${Date.now()}`, {
         cache: "no-store",
       });
 
-      const data = await res.json();
+      const data = await parseJsonSafely(res);
 
       if (!res.ok) {
         setStudentAddMessage(
@@ -135,32 +240,125 @@ export default function Home() {
     }
   }, [authorized]);
 
-  const levels = ["전체", ...levelOptions];
-  const uniqueStudents = uniqueStudentList(students);
+  async function loadReport(studentName: string, month: string) {
+    setLoadingReport(true);
+    setMessage("불러오는 중...");
 
-  const filteredStudents =
-    selectedLevel === "전체"
-      ? uniqueStudents
-      : uniqueStudents.filter((student) => student.level === selectedLevel);
+    try {
+      const res = await fetch(
+        `/api/report?studentName=${encodeURIComponent(
+          studentName
+        )}&month=${encodeURIComponent(month)}&ts=${Date.now()}`,
+        { cache: "no-store" }
+      );
 
-  function escapeExcelHtml(value: any) {
-    const text = String(value ?? "");
-    const safeText = /^[=+\-@]/.test(text.trim()) ? `'${text}` : text;
+      const data = await parseJsonSafely(res);
 
-    return safeText
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;")
-      .replace(/\n/g, "<br />");
+      if (!res.ok) {
+        throw new Error(data.detail || data.error || "불러오기 실패");
+      }
+
+      const localDraft = loadLocalDraftData(studentName, month);
+
+      if (data.exists) {
+        const serverContent = data.content || "";
+
+        if (localDraft?.content && localDraft.content !== serverContent) {
+          setContent(localDraft.content);
+          setLastSavedContent(serverContent);
+
+          setMessage(
+            "서버 저장본과 다르게 작성 중이던 임시저장본을 복구했습니다. 확인 후 저장 버튼을 눌러주세요."
+          );
+        } else {
+          setContent(serverContent);
+          setLastSavedContent(serverContent);
+          setMessage("기존 관찰일지를 불러왔습니다.");
+        }
+      } else {
+        if (localDraft?.content) {
+          setContent(localDraft.content);
+          setLastSavedContent("");
+
+          setMessage(
+            "서버 저장본은 없지만, 이 브라우저에 남아 있던 임시저장본을 복구했습니다. 저장 버튼을 눌러주세요."
+          );
+        } else {
+          setContent("");
+          setLastSavedContent("");
+          setMessage("새 관찰일지를 작성해주세요.");
+        }
+      }
+    } catch (error: any) {
+      const localDraft = loadLocalDraftData(studentName, month);
+
+      if (localDraft?.content) {
+        setContent(localDraft.content);
+        setMessage(
+          "서버 불러오기에 실패했지만, 브라우저 임시저장본을 복구했습니다. 저장 버튼을 다시 눌러주세요."
+        );
+      } else {
+        setMessage("불러오기 실패: " + error.message);
+      }
+    } finally {
+      setLoadingReport(false);
+    }
   }
 
-  function safeFilePart(value: string) {
-    return String(value || "")
-      .replace(/[\\/:*?"<>|]/g, "_")
-      .replace(/\s+/g, "_")
-      .trim();
+  async function saveReport() {
+    if (!selectedStudent) {
+      setMessage("학생을 먼저 선택해주세요.");
+      return;
+    }
+
+    if (!content.trim()) {
+      setMessage("관찰일지를 입력해주세요.");
+      return;
+    }
+
+    if (savingReport) return;
+
+    setSavingReport(true);
+    setMessage("저장 중... 잠시만 기다려주세요.");
+
+    saveLocalDraft(selectedStudent.name, selectedMonth, content);
+
+    try {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          studentName: selectedStudent.name,
+          month: selectedMonth,
+          content,
+        }),
+      });
+
+      const data = await parseJsonSafely(res);
+
+      if (!res.ok) {
+        throw new Error(data.detail || data.error || "저장 실패");
+      }
+
+      setLastSavedContent(content);
+      clearLocalDraft(selectedStudent.name, selectedMonth);
+
+      if (data.mode === "updated") {
+        setMessage("기존 관찰일지를 수정 완료했습니다.");
+      } else {
+        setMessage("새 관찰일지를 저장 완료했습니다.");
+      }
+    } catch (error: any) {
+      setMessage(
+        "저장 실패: " +
+          error.message +
+          " / 작성 내용은 이 브라우저에 임시저장되어 있습니다."
+      );
+    } finally {
+      setSavingReport(false);
+    }
   }
 
   async function exportMonthlyReports() {
@@ -188,7 +386,7 @@ export default function Home() {
           { cache: "no-store" }
         );
 
-        const data = await res.json();
+        const data = await parseJsonSafely(res);
 
         rows.push({
           name: student.name || "",
@@ -342,7 +540,7 @@ export default function Home() {
         }),
       });
 
-      const data = await res.json();
+      const data = await parseJsonSafely(res);
 
       if (!res.ok) {
         setStudentAddMessage(
@@ -391,7 +589,7 @@ export default function Home() {
         }),
       });
 
-      const data = await res.json();
+      const data = await parseJsonSafely(res);
 
       if (!res.ok) {
         setStudentAddMessage(
@@ -403,6 +601,7 @@ export default function Home() {
       if (selectedStudent?.id === student.id) {
         setSelectedStudent(null);
         setContent("");
+        setLastSavedContent("");
         setMessage("");
       }
 
@@ -451,7 +650,7 @@ export default function Home() {
         }),
       });
 
-      const data = await res.json();
+      const data = await parseJsonSafely(res);
 
       if (!res.ok) {
         setStudentAddMessage(
@@ -487,27 +686,6 @@ export default function Home() {
     }
   }
 
-  async function loadReport(studentName: string, month: string) {
-    setMessage("불러오는 중...");
-
-    const res = await fetch(
-      `/api/report?studentName=${encodeURIComponent(
-        studentName
-      )}&month=${encodeURIComponent(month)}&ts=${Date.now()}`,
-      { cache: "no-store" }
-    );
-
-    const data = await res.json();
-
-    if (data.exists) {
-      setContent(data.content || "");
-      setMessage("기존 관찰일지를 불러왔습니다.");
-    } else {
-      setContent("");
-      setMessage("새 관찰일지를 작성해주세요.");
-    }
-  }
-
   async function copyPreviousMonth() {
     if (!selectedStudent) {
       setMessage("학생을 먼저 선택해주세요.");
@@ -523,22 +701,29 @@ export default function Home() {
 
     const previousMonth = months[currentIndex - 1];
 
-    const res = await fetch(
-      `/api/report?studentName=${encodeURIComponent(
-        selectedStudent.name
-      )}&month=${encodeURIComponent(previousMonth)}&ts=${Date.now()}`,
-      { cache: "no-store" }
-    );
-
-    const data = await res.json();
-
-    if (data.exists) {
-      setContent(data.content || "");
-      setMessage(
-        `${previousMonth} 내용을 ${selectedMonth}에 복사했습니다. 저장하기를 누르면 반영됩니다.`
+    try {
+      const res = await fetch(
+        `/api/report?studentName=${encodeURIComponent(
+          selectedStudent.name
+        )}&month=${encodeURIComponent(previousMonth)}&ts=${Date.now()}`,
+        { cache: "no-store" }
       );
-    } else {
-      setMessage(`${previousMonth}에 저장된 관찰일지가 없습니다.`);
+
+      const data = await parseJsonSafely(res);
+
+      if (data.exists) {
+        const copiedContent = data.content || "";
+        setContent(copiedContent);
+        saveLocalDraft(selectedStudent.name, selectedMonth, copiedContent);
+
+        setMessage(
+          `${previousMonth} 내용을 ${selectedMonth}에 복사했습니다. 저장하기를 누르면 반영됩니다.`
+        );
+      } else {
+        setMessage(`${previousMonth}에 저장된 관찰일지가 없습니다.`);
+      }
+    } catch (error: any) {
+      setMessage("지난달 복사 실패: " + error.message);
     }
   }
 
@@ -557,8 +742,10 @@ export default function Home() {
       level.includes("GK004") ||
       level.includes("GK005");
 
+    let template = "";
+
     if (isLower) {
-      setContent(`🧭 진도 적응도
+      template = `🧭 진도 적응도
 
 - 
 
@@ -576,9 +763,9 @@ export default function Home() {
 
 👩‍👦 마무리 말씀
 
-- `);
+- `;
     } else {
-      setContent(`📊 진도 및 학습 흐름
+      template = `📊 진도 및 학습 흐름
 
 - 
 
@@ -596,9 +783,11 @@ export default function Home() {
 
 💌 마무리 말씀
 
-- `);
+- `;
     }
 
+    setContent(template);
+    saveLocalDraft(selectedStudent.name, selectedMonth, template);
     setMessage("관찰일지 양식을 불러왔습니다.");
   }
 
@@ -625,7 +814,7 @@ export default function Home() {
         }),
       });
 
-      const data = await res.json();
+      const data = await parseJsonSafely(res);
 
       if (!res.ok) {
         setMessage(
@@ -635,7 +824,10 @@ export default function Home() {
         return;
       }
 
-      setContent(data.draft || "");
+      const draft = data.draft || "";
+      setContent(draft);
+      saveLocalDraft(selectedStudent.name, selectedMonth, draft);
+
       setMessage("AI 초안 생성 완료! 내용을 확인 후 수정하고 저장하세요.");
     } catch (error: any) {
       setMessage("AI 초안 생성 실패: " + error.message);
@@ -660,49 +852,8 @@ ${content}`;
     try {
       await navigator.clipboard.writeText(textToCopy);
       setMessage("관찰일지가 복사되었습니다. 카카오 채팅방에 붙여넣기하세요.");
-    } catch (error: any) {
+    } catch {
       setMessage("복사 실패: 브라우저에서 복사를 허용하지 않았습니다.");
-    }
-  }
-
-  async function saveReport() {
-    if (!selectedStudent) {
-      setMessage("학생을 먼저 선택해주세요.");
-      return;
-    }
-
-    if (!content.trim()) {
-      setMessage("관찰일지를 입력해주세요.");
-      return;
-    }
-
-    setMessage("저장 중...");
-
-    const res = await fetch("/api/reports", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        studentName: selectedStudent.name,
-        month: selectedMonth,
-        content,
-      }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      setMessage(
-        "저장 실패: " + (data.detail || data.error || "알 수 없는 오류")
-      );
-      return;
-    }
-
-    if (data.mode === "updated") {
-      setMessage("기존 관찰일지를 수정 완료했습니다.");
-    } else {
-      setMessage("새 관찰일지를 저장 완료했습니다.");
     }
   }
 
@@ -871,9 +1022,12 @@ ${content}`;
           <button
             key={level}
             onClick={() => {
+              if (!confirmMoveIfUnsaved()) return;
+
               setSelectedLevel(level);
               setSelectedStudent(null);
               setContent("");
+              setLastSavedContent("");
               setMessage("");
             }}
             style={{
@@ -1042,6 +1196,8 @@ ${content}`;
           >
             <button
               onClick={async () => {
+                if (!confirmMoveIfUnsaved()) return;
+
                 setSelectedStudent(student);
                 setSelectedMonth("1월");
                 await loadReport(student.name, "1월");
@@ -1161,6 +1317,9 @@ ${content}`;
               <button
                 key={month}
                 onClick={async () => {
+                  if (!selectedStudent) return;
+                  if (!confirmMoveIfUnsaved()) return;
+
                   setSelectedMonth(month);
                   await loadReport(selectedStudent.name, month);
                 }}
@@ -1191,6 +1350,7 @@ ${content}`;
             <button
               type="button"
               onClick={copyPreviousMonth}
+              disabled={loadingReport || savingReport}
               style={{
                 padding: "10px 14px",
                 borderRadius: 10,
@@ -1205,6 +1365,7 @@ ${content}`;
             <button
               type="button"
               onClick={generateTemplate}
+              disabled={loadingReport || savingReport}
               style={{
                 padding: "10px 14px",
                 borderRadius: 10,
@@ -1219,6 +1380,7 @@ ${content}`;
             <button
               type="button"
               onClick={generateAiDraft}
+              disabled={loadingReport || savingReport}
               style={{
                 padding: "10px 14px",
                 borderRadius: 10,
@@ -1233,6 +1395,7 @@ ${content}`;
             <button
               type="button"
               onClick={copyReportText}
+              disabled={loadingReport || savingReport}
               style={{
                 padding: "10px 14px",
                 borderRadius: 10,
@@ -1247,14 +1410,23 @@ ${content}`;
 
           <textarea
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              setContent(value);
+
+              if (selectedStudent) {
+                saveLocalDraft(selectedStudent.name, selectedMonth, value);
+              }
+            }}
             placeholder="관찰일지를 입력하세요"
+            disabled={loadingReport}
             style={{
               width: "100%",
               height: 300,
               padding: 16,
               borderRadius: 12,
               border: "1px solid #ccc",
+              background: loadingReport ? "#f3f4f6" : "white",
             }}
           />
 
@@ -1263,21 +1435,28 @@ ${content}`;
 
           <button
             onClick={saveReport}
+            disabled={savingReport || loadingReport}
             style={{
               padding: "12px 20px",
               borderRadius: 10,
               border: "none",
-              background: "black",
+              background: savingReport || loadingReport ? "#999" : "black",
               color: "white",
-              cursor: "pointer",
+              cursor: savingReport || loadingReport ? "not-allowed" : "pointer",
             }}
           >
-            저장하기
+            {savingReport ? "저장 중..." : "저장하기"}
           </button>
 
           <p style={{ marginTop: 16, fontWeight: "bold", color: "blue" }}>
             {message}
           </p>
+
+          {hasUnsavedContent() && (
+            <p style={{ marginTop: 8, color: "#b45309", fontWeight: "bold" }}>
+              작성 중인 내용이 임시저장되어 있습니다. 최종 반영은 저장하기를 눌러주세요.
+            </p>
+          )}
         </>
       )}
     </main>
