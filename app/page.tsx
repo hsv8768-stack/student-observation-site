@@ -26,6 +26,7 @@ const levelOptions = [
   "초6 화수금CK",
   "GR201",
   "GR105",
+  "GR104(1)",
   "GR104",
   "GR103(1)",
   "GR103",
