@@ -31,7 +31,7 @@ const levelOptions = [
   "GR103(1)",
   "GR103",
   "GR102",
-  "GR101",
+  "GR101(1)",
   "GR101",
   "GK005(1)",
   "GK005",
